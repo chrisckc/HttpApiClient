@@ -21,14 +21,6 @@ namespace HttpApiClient
         private readonly ApiClientOptions<TClient> _options;
         private IServiceCollection _services { get; }
 
-        // public ApiClientBuilder(IServiceCollection services, ILoggerFactory loggerFactory, IOptions<ApiClientBuilderOptions> options)
-        // {
-        //     _services = services;
-        //     _options = options;
-        //     _logger = loggerFactory.CreateLogger<ApiClient>();
-        //     SetDefaults();
-        // }
-
         public ApiClientBuilder(IServiceCollection services, ApiClientOptions<TClient> options, ILogger logger)
         {
             if (services == null) throw new ArgumentNullException(nameof(services));
@@ -87,7 +79,7 @@ namespace HttpApiClient
             }
         }
 
-        public IHttpClientBuilder ConfigureApiClient<TClient>() where TClient : class {
+        public IHttpClientBuilder ConfigureApiClient() {
             // Add the HttpClient
             return _services.AddHttpClient<TClient>(client => {
                 client.BaseAddress = _options.BaseUrl;

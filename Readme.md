@@ -7,7 +7,7 @@ This library makes easy and clean work of using multiple HttpClients by allowing
 The ApiClient class acts as a wrapper around HttpClient, encapsulating the Polly configuration and providing some useful but limited configuration options. Logging has been added to show when retries are taking place.
 
 Configuration is provided by the Options framework using the IConfigureOptions interface.
-The Configuration object ApiClientOptions can be sub-classed to add additional configuration options which are made available to the sub-classed ApiClient in its constructor.
+The Configuration object ApiClientOptions can be sub-classed to add additional configuration options which are made available to the sub-classed ApiClient in it's constructor. The .Net Core source code was useful in figuring out how to create the required ServiceCollection extension methods.
 
 Response data is returned as part of an ApiResponse object, as either a JObject or a string depending on the Content-Type header received. A Library such as AutoMapper could then be used to hydrate your own business objects from the JObject if required.
 
@@ -102,6 +102,24 @@ A How-To issue that I logged: ".Net Core: Access Information about retry attempt
 https://github.com/App-vNext/Polly/issues/505
 
 Resulting in updated Docs: https://github.com/App-vNext/Polly/wiki/Polly-and-HttpClientFactory
+
+[already possible] Respect Retry-After HTTP header:
+https://github.com/App-vNext/Polly/issues/414
+
+Using Execution Context in Polly:
+http://www.thepollyproject.org/2017/05/04/putting-the-context-into-polly/
+
+How to use HttpClientHandler with IHttpClientFactory:
+https://github.com/aspnet/HttpClientFactory/issues/71
+
+https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/options?view=aspnetcore-2.1
+
+Source code references:
+https://github.com/aspnet/Options/tree/master/src/Microsoft.Extensions.Options
+
+https://github.com/aspnet/HttpClientFactory/blob/master/src/Microsoft.Extensions.Http/DependencyInjection/HttpClientFactoryServiceCollectionExtensions.cs
+
+https://github.com/aspnet/HttpClientFactory/blob/master/src/Microsoft.Extensions.Http/DependencyInjection/HttpClientBuilderExtensions.cs
 
 HttpClient throws TaskCanceledException on timeout (looks like its only going to be fixed in v3.0)
 https://github.com/dotnet/corefx/issues/20296

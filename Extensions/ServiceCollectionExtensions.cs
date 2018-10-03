@@ -66,7 +66,7 @@ namespace HttpApiClient.Extensions
                 services.AddSingleton<TOptions>(options);
                 
                 // Finally configure the client
-                return builder.ConfigureApiClient<TClient>();
+                return builder.ConfigureApiClient();
             }
         }
     }
