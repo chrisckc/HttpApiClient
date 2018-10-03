@@ -6,7 +6,7 @@ using HttpApiClient.ErrorParsers;
 
 namespace HttpApiClient
 {
-    public class ApiClientOptions<TClient> : IApiClientOptions<TClient> where TClient : class
+    public class ApiClientOptions<TClient> where TClient : class
     {
         public Uri BaseUrl { get; set; }
         public string BasicAuthUsername { get; set; } // Basic Authentication Scheme username

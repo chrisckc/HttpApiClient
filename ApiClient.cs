@@ -22,7 +22,7 @@ namespace HttpApiClient
         public int RequestCounter { get; set; }
         public DateTimeOffset LastRequestTimeStamp { get; private set; }
 
-        public ApiClient(HttpClient client, IApiClientOptions<TClient> options, ILogger<TClient> logger)
+        public ApiClient(HttpClient client, ApiClientOptions<TClient> options, ILogger<TClient> logger)
         {
             _client = client;
             _logger = logger;

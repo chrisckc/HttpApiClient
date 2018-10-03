@@ -18,7 +18,7 @@ namespace HttpApiClient
     internal class ApiClientBuilder<TClient> where TClient : class
     {
         private readonly ILogger _logger;
-        private readonly IApiClientOptions<TClient> _options;
+        private readonly ApiClientOptions<TClient> _options;
         private IServiceCollection _services { get; }
 
         // public ApiClientBuilder(IServiceCollection services, ILoggerFactory loggerFactory, IOptions<ApiClientBuilderOptions> options)
@@ -29,7 +29,7 @@ namespace HttpApiClient
         //     SetDefaults();
         // }
 
-        public ApiClientBuilder(IServiceCollection services, IApiClientOptions<TClient> options, ILogger logger)
+        public ApiClientBuilder(IServiceCollection services, ApiClientOptions<TClient> options, ILogger logger)
         {
             if (services == null) throw new ArgumentNullException(nameof(services));
             if (options == null) throw new ArgumentNullException(nameof(options));

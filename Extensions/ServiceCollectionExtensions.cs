@@ -10,7 +10,7 @@ namespace HttpApiClient.Extensions
 {
     public static class ServiceCollectionExtensions
     {        
-        public static IHttpClientBuilder AddApiClient<TClient>(this IServiceCollection services, Action<IApiClientOptions<TClient>> configureClient)
+        public static IHttpClientBuilder AddApiClient<TClient>(this IServiceCollection services, Action<ApiClientOptions<TClient>> configureClient)
             where TClient : ApiClient<TClient>
         {
             return AddApiClient<TClient, ApiClientOptions<TClient>>(services, configureClient);
