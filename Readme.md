@@ -60,7 +60,7 @@ services.AddApiClient<SampleApiClient>(options => {
 Note: Options provided in the configuration lambda override options from config files.
 
 Refer to the sample project for usage examples:
-Link to go here....
+https://github.com/chrisckc/HttpApiClientDemo.git
 
 ## Features
 
