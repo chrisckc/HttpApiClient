@@ -1,5 +1,6 @@
 using System;
 using System.Net.Http.Headers;
+using Newtonsoft.Json.Linq;
 
 namespace HttpApiClient.Models
 {
@@ -14,7 +15,7 @@ namespace HttpApiClient.Models
         public string ContentType { get; set; }
         public HttpResponseHeaders Headers { get; set; }
         public RetryInfo RetryInfo { get; set; }
-        public dynamic Data { get; set; }
+        public JToken Data { get; set; }
         public string Body { get; set; }
         public Exception Exception { get; set; }
         public string ErrorTitle { get; set; }

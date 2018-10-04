@@ -76,6 +76,16 @@ namespace HttpApiClient
             return await SendAsync(HttpMethod.Put, resource, obj);                   
         }
 
+        public virtual async Task<ApiResponse> DeleteResource(string resource, TimeSpan? delay = null) {
+            if (delay.HasValue) {
+                _logger.LogDebug($"{DateTime.Now.ToString()} : Deleting Resource {resource} after delay {delay.Value}...");
+                await Task.Delay(delay.Value);
+            } else {
+                _logger.LogDebug($"{DateTime.Now.ToString()} : Deleting Resource {resource} ...");
+            }
+            return await SendAsync(HttpMethod.Delete, resource);                   
+        }
+
         public virtual async Task<ApiResponse> SendAsync(HttpMethod method, string resource, object obj) {
             try {
                 _logger.LogDebug($"{DateTime.Now.ToString()} : Serializing Object of Type: {obj?.GetType()?.ToString()}");
@@ -103,7 +113,6 @@ namespace HttpApiClient
             // https://github.com/App-vNext/Polly/issues/505
             request.SetPolicyExecutionContext(context);
             AugmentContext(context, resource, request);
-            //CancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(2)); // Testing cancellation
             // Make the request
             RequestCounter++;
             LastRequestTimeStamp = DateTime.UtcNow;

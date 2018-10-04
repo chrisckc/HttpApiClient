@@ -33,11 +33,11 @@ namespace HttpApiClient
                 ApiResponse apiResponse = BuildApiResponse(response.IsSuccessStatusCode, resource, response);
                 // Attempt to parse the response body, this may fail due to bad content
                 try {
-                    // If the content type header says json then try parsing into a JObject
+                    // If the content type header says json then try parsing into a JToken (JObject and JArray both inherit from JToken)
                     if (apiResponse.ContentType != null &&
                         (apiResponse.ContentType.ToLower().Contains("application/json") || apiResponse.ContentType.ToLower().Contains("application/problem+json"))) {
-                        apiResponse.Data = await response.Content.ReadAsAsync<JObject>();
-                        //apiResponse.Data = JsonConvert.DeserializeObject<JObject>(await response?.Content?.ReadAsStringAsync());
+                        apiResponse.Data = await response.Content.ReadAsAsync<JToken>();
+                        //apiResponse.Data = JsonConvert.DeserializeObject<JToken>(await response?.Content?.ReadAsStringAsync());
                         if (AlwaysPopulateResponseBody) apiResponse.Body = await response?.Content?.ReadAsStringAsync();
                     } else {
                         apiResponse.Body = await response?.Content?.ReadAsStringAsync();
@@ -122,7 +122,7 @@ namespace HttpApiClient
             apiResponse.Exception = exception;
             apiResponse.Url = request?.RequestUri?.AbsoluteUri?.ToString();
             apiResponse.Method = request?.Method?.ToString();
-            if (exception is System.Threading.Tasks.TaskCanceledException || exception is System.OperationCanceledException) {
+            if (exception is System.OperationCanceledException) {
                 apiResponse.ErrorTitle = $"The request was cancelled while {apiResponse.Method}ing resource: {resource}";
             } else {
                 apiResponse.ErrorTitle = $"Exception occurred while {apiResponse.Method}ing resource: {resource}";

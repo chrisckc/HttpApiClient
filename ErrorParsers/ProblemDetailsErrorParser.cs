@@ -21,26 +21,26 @@ namespace HttpApiClient.ErrorParsers
                 _logger.LogDebug($"{this.GetType().ToString()} : Parsing Response Object for Known Errors");
                 // Also Check if the members of the Problem Details object are under an "error" root object
                 // Try to get an error title
-                string errorTitle = apiResponse.Data?.SelectToken("title");
-                if (errorTitle == null) errorTitle = apiResponse.Data?.SelectToken("error")?.SelectToken("title")?.Value;
+                string errorTitle = apiResponse.Data?.Value<string>("title");
+                if (errorTitle == null) errorTitle = apiResponse.Data?.SelectToken("error")?.Value<string>("title");
                 if (!string.IsNullOrEmpty(errorTitle)) {
                     apiResponse.ErrorTitle = errorTitle;
                 }
                 // Try to get an error type
-                string errorType = apiResponse.Data?.SelectToken("type");
-                if (errorType == null) errorType = apiResponse.Data?.SelectToken("error")?.SelectToken("type")?.Value;
+                string errorType = apiResponse.Data?.Value<string>("type");
+                if (errorType == null) errorType = apiResponse.Data?.SelectToken("error")?.Value<string>("type");
                 if (!string.IsNullOrEmpty(errorType)) {
                     apiResponse.ErrorType = errorType;
                 }
                 // Try to get the error detail
-                string errorDetail = apiResponse.Data?.SelectToken("detail");
-                if (errorDetail == null) errorDetail = apiResponse.Data?.SelectToken("error")?.SelectToken("detail")?.Value;
+                string errorDetail = apiResponse.Data?.Value<string>("detail");
+                if (errorDetail == null) errorDetail = apiResponse.Data?.SelectToken("error")?.Value<string>("detail");
                 if (!string.IsNullOrEmpty(errorDetail)) {
                     apiResponse.ErrorDetail = errorDetail;
                 }
                 // Try to get the error instance
-                string errorInstance = apiResponse.Data?.SelectToken("instance");
-                if (errorInstance == null) errorInstance = apiResponse.Data?.SelectToken("error")?.SelectToken("instance")?.Value;
+                string errorInstance = apiResponse.Data?.Value<string>("instance");
+                if (errorInstance == null) errorInstance = apiResponse.Data?.SelectToken("error")?.Value<string>("instance");
                 if (!string.IsNullOrEmpty(errorInstance)) {
                     apiResponse.ErrorInstance = errorInstance;
                 }

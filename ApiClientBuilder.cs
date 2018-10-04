@@ -38,7 +38,7 @@ namespace HttpApiClient
                 _options.UserAgent = "HttpClient";
             }
             if (!_options.RequestTimeout.HasValue) {
-                _options.RequestTimeout = 60; // 60 seconds
+                _options.RequestTimeout = 60; // use 60 seconds rather than the HttpClient default of 100 seconds
             }
             if (!_options.RetryWaitDuration.HasValue) {
                 _options.RetryWaitDuration = 4;  // 4 seconds

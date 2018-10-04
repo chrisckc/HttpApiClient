@@ -9,7 +9,7 @@ The ApiClient class acts as a wrapper around HttpClient, encapsulating the Polly
 Configuration is provided by the Options framework using the IConfigureOptions interface.
 The Configuration object ApiClientOptions can be sub-classed to add additional configuration options which are made available to the sub-classed ApiClient in it's constructor. The .Net Core source code was useful in figuring out how to create the required ServiceCollection extension methods.
 
-Response data is returned as part of an ApiResponse object, as either a JObject or a string depending on the Content-Type header received. A Library such as AutoMapper could then be used to hydrate your own business objects from the JObject if required.
+Response data is returned as part of an ApiResponse object, as either a JToken or a string depending on the Content-Type header received. A Library such as AutoMapper could then be used to hydrate your own business objects / POCO's or DTO's from the JToken if required.
 
 If the Content-Type header received is not "application/json" or "application/problem+json", the response is read as a string. This feature has been added because it is often the case that some 3rd party JSON API's can return unexpected and inconsistent content types when handling errors.
 
