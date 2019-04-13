@@ -40,6 +40,9 @@ namespace HttpApiClient
             if (!_options.RequestTimeout.HasValue) {
                 _options.RequestTimeout = 60; // use 60 seconds rather than the HttpClient default of 100 seconds
             }
+            if (!_options.AllowAutoRedirect.HasValue) {
+                _options.AllowAutoRedirect = true; // same default as the HttpClientHandler
+            }
             if (!_options.RetryWaitDuration.HasValue) {
                 _options.RetryWaitDuration = 4;  // 4 seconds
             }
@@ -98,7 +101,9 @@ namespace HttpApiClient
             // Add the Timeout Handler so we can determine when a request actually times out
             .ConfigurePrimaryHttpMessageHandler(() => new TimeoutHandler(_logger) {
                 DefaultTimeout = TimeSpan.FromSeconds(_options.RequestTimeout.Value),
-                InnerHandler = new HttpClientHandler()
+                InnerHandler = new HttpClientHandler() {
+                    AllowAutoRedirect = _options.AllowAutoRedirect.Value
+                }
             })
             // Configure Polly
             //.AddPolicyHandler(waitAndRetryPolicy)
@@ -153,18 +158,8 @@ namespace HttpApiClient
         private Func<DelegateResult<HttpResponseMessage>, TimeSpan, int, Context, Task> LogRetry() {
             return async(result, timeSpan, retryAttempt, context) => {
                 // Some nice logging
-                string reason = null;
-                if (result.Exception != null) {
-                    reason = $"Exception: {result.Exception.Message}";
-                } else if (result.Result != null) {
-                    reason = $"StatusCode: {(int)result.Result.StatusCode} ({result.Result.StatusCode.ToString()})";
-                }
-                string resource = (string)context["Resource"];
-                string url = (string)context["Url"];
-                string httpMethod = (string)context["HttpMethod"];
-                string message = $"{DateTime.Now.ToString()} : {httpMethod} Request to Resource: {resource} failed with {reason}. Waiting {timeSpan} ({timeSpan.TotalSeconds} seconds) before retrying...";
-                if (retryAttempt > 1) message = $"{message}. Retry attempts: {retryAttempt - 1}";
-                _logger.LogWarning(message);
+                var retryInfo = GetRetryInfo(result, timeSpan, retryAttempt);
+                _logger.LogWarning(retryInfo.message);
                 string contentType = null;
                 string responseBody = null;
                 if (result.Result != null) {
@@ -173,8 +168,38 @@ namespace HttpApiClient
                     _logger.LogDebug($"ContentType: {contentType}\nResponseBody:\n{responseBody}");
                 }
                 // Store information about the retry attempts in the PolicyExecutionContext
-                BuildRetryInfo(result, timeSpan, retryAttempt, context, reason, message, contentType, responseBody);
+                BuildRetryInfo(result, timeSpan, retryAttempt, context, retryInfo.reason, retryInfo.message, contentType, responseBody);
             };
+        }
+
+        // Get info about the retry event
+        // Returns a Named Tuple https://docs.microsoft.com/en-us/dotnet/csharp/tuples
+        private (string message, string reason) GetRetryInfo(DelegateResult<HttpResponseMessage> result, TimeSpan timeSpan, int retryAttempt) {
+            string reason = null;
+            string resourcePath = null;
+            string requestUrl = null;
+            string originalRequestUrl = null;
+            string originalRequestMethod = null;
+            if (result.Exception != null) {
+                reason = $"Exception: {result.Exception.Message}";
+                resourcePath = result.Exception.GetResourcePath();
+                requestUrl = result.Exception.GetRequestUrl();
+                originalRequestUrl = result.Exception.GetOriginalRequestUrl();
+                originalRequestMethod = result.Exception.GetOriginalRequestMethod();
+            } else if (result.Result != null) { //result.Result is a HttpResponseMessage
+                reason = $"StatusCode: {(int)result.Result.StatusCode} ({result.Result.StatusCode.ToString()})";
+                resourcePath = result.Result.RequestMessage.GetResourcePath();
+                requestUrl = result.Result?.RequestMessage?.RequestUri?.AbsoluteUri?.ToString();
+                originalRequestUrl = result.Result.RequestMessage.GetOriginalRequestUrl();
+                originalRequestMethod = result.Result.RequestMessage.GetOriginalRequestMethod();
+            }
+            // Detect if we were redirected
+            bool isRedirected = false;
+            if (!String.IsNullOrEmpty(requestUrl) && requestUrl != originalRequestUrl) isRedirected = true;
+            string redirected = isRedirected ? "Redirected" : "";
+            string message = $"{DateTime.Now.ToString()} : Failed {redirected} {originalRequestMethod} Request to Resource: {resourcePath} {redirected}Url: {requestUrl} failed with {reason}. \nWaiting {timeSpan} ({timeSpan.TotalSeconds} seconds) before retrying...";
+            if (retryAttempt > 1) message = $"{message}. Retry attempts: {retryAttempt - 1}";
+            return (message, reason);
         }
 
         private void BuildRetryInfo(DelegateResult<HttpResponseMessage> result, TimeSpan timeSpan, int retryAttempt, Context context,

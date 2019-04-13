@@ -19,7 +19,8 @@ namespace HttpApiClient
         protected readonly ILogger<TClient> _logger;
         private ApiResponseBuilder<TClient> _apiResponseBuilder;
         public CancellationTokenSource CancellationTokenSource { get; set; }
-        public int RequestCounter { get; set; }
+        public int PendingRequestCount { get; set; }
+        public int RequestCount { get; set; }
         public DateTimeOffset LastRequestTimeStamp { get; private set; }
 
         public ApiClient(HttpClient client, ApiClientOptions<TClient> options, ILogger<TClient> logger)
@@ -46,47 +47,52 @@ namespace HttpApiClient
             _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
         }
 
-        public virtual async Task<ApiResponse> GetResource(string resource, TimeSpan? delay = null) {
-            if (delay.HasValue) {
-                _logger.LogDebug($"{DateTime.Now.ToString()} : Getting Resource {resource} after delay {delay.Value}...");
-                await Task.Delay(delay.Value);
-            } else {
-                _logger.LogDebug($"{DateTime.Now.ToString()} : Getting Resource {resource} ...");
-            }
-            return await SendAsync(HttpMethod.Get, resource);
+        public void clearBearerToken(string bearerToken)
+        {
+            _client.DefaultRequestHeaders.Remove("Authorization");
         }
 
-        public virtual async Task<ApiResponse> PostResource(string resource, object obj, TimeSpan? delay = null) {
+        public virtual async Task<ApiResponse> GetResource(string resourcePath, TimeSpan? delay = null) {
             if (delay.HasValue) {
-                _logger.LogDebug($"{DateTime.Now.ToString()} : Posting Resource {resource} after delay {delay.Value}...");
+                _logger.LogDebug($"{DateTime.Now.ToString()} : Getting Resource {resourcePath} after delay {delay.Value}...");
                 await Task.Delay(delay.Value);
             } else {
-                _logger.LogDebug($"{DateTime.Now.ToString()} : Posting Resource {resource} ...");
+                _logger.LogDebug($"{DateTime.Now.ToString()} : Getting Resource {resourcePath} ...");
             }
-            return await SendAsync(HttpMethod.Post, resource, obj);                   
+            return await SendAsync(HttpMethod.Get, resourcePath);
         }
 
-        public virtual async Task<ApiResponse> PutResource(string resource, object obj, TimeSpan? delay = null) {
+        public virtual async Task<ApiResponse> PostResource(string resourcePath, object obj, TimeSpan? delay = null) {
             if (delay.HasValue) {
-                _logger.LogDebug($"{DateTime.Now.ToString()} : Putting Resource {resource} after delay {delay.Value}...");
+                _logger.LogDebug($"{DateTime.Now.ToString()} : Posting Resource {resourcePath} after delay {delay.Value}...");
                 await Task.Delay(delay.Value);
             } else {
-                _logger.LogDebug($"{DateTime.Now.ToString()} : Putting Resource {resource} ...");
+                _logger.LogDebug($"{DateTime.Now.ToString()} : Posting Resource {resourcePath} ...");
             }
-            return await SendAsync(HttpMethod.Put, resource, obj);                   
+            return await SendAsync(HttpMethod.Post, resourcePath, obj);                   
         }
 
-        public virtual async Task<ApiResponse> DeleteResource(string resource, TimeSpan? delay = null) {
+        public virtual async Task<ApiResponse> PutResource(string resourcePath, object obj, TimeSpan? delay = null) {
             if (delay.HasValue) {
-                _logger.LogDebug($"{DateTime.Now.ToString()} : Deleting Resource {resource} after delay {delay.Value}...");
+                _logger.LogDebug($"{DateTime.Now.ToString()} : Putting Resource {resourcePath} after delay {delay.Value}...");
                 await Task.Delay(delay.Value);
             } else {
-                _logger.LogDebug($"{DateTime.Now.ToString()} : Deleting Resource {resource} ...");
+                _logger.LogDebug($"{DateTime.Now.ToString()} : Putting Resource {resourcePath} ...");
             }
-            return await SendAsync(HttpMethod.Delete, resource);                   
+            return await SendAsync(HttpMethod.Put, resourcePath, obj);                   
         }
 
-        public virtual async Task<ApiResponse> SendAsync(HttpMethod method, string resource, object obj) {
+        public virtual async Task<ApiResponse> DeleteResource(string resourcePath, TimeSpan? delay = null) {
+            if (delay.HasValue) {
+                _logger.LogDebug($"{DateTime.Now.ToString()} : Deleting Resource {resourcePath} after delay {delay.Value}...");
+                await Task.Delay(delay.Value);
+            } else {
+                _logger.LogDebug($"{DateTime.Now.ToString()} : Deleting Resource {resourcePath} ...");
+            }
+            return await SendAsync(HttpMethod.Delete, resourcePath);                   
+        }
+
+        public virtual async Task<ApiResponse> SendAsync(HttpMethod method, string resourcePath, object obj) {
             try {
                 _logger.LogDebug($"{DateTime.Now.ToString()} : Serializing Object of Type: {obj?.GetType()?.ToString()}");
                 StringContent stringContent = null;
@@ -94,57 +100,45 @@ namespace HttpApiClient
                     var dataAsString = JsonConvert.SerializeObject(obj);
                     stringContent = new StringContent(dataAsString, System.Text.Encoding.UTF8, "application/json");
                 }
-                return await SendAsync(method, resource, stringContent);
+                return await SendAsync(method, resourcePath, stringContent);
             } catch (Exception exception) {
-                _logger.LogError($"{DateTime.Now.ToString()} : Exception occurred during Serialization while attempting to Post resource: {resource}\nException: {exception.ToString()}");
+                _logger.LogError($"{DateTime.Now.ToString()} : Exception occurred during Serialization while attempting to Post resource: {resourcePath}\nException: {exception.ToString()}");
                 return null;
             }                      
         }
 
-        public virtual async Task<ApiResponse> SendAsync(HttpMethod method, string resource, HttpContent content = null) {
+        public virtual async Task<ApiResponse> SendAsync(HttpMethod method, string resourcePath, HttpContent content = null) {
             // Create the context here so we have access to it in the catch block
             Polly.Context context = new Polly.Context();
             //Create the Request
-            HttpRequestMessage request = new HttpRequestMessage(method, resource);
+            HttpRequestMessage request = new HttpRequestMessage(method, resourcePath);
             if (content != null) {
                 request.Content = content;
             }
             // Set the PolicyExecutionContext so that it is available after execution of the request
             // https://github.com/App-vNext/Polly/issues/505
             request.SetPolicyExecutionContext(context);
-            AugmentContext(context, resource, request);
+            request.SetResourcePath(resourcePath);
             // Make the request
-            RequestCounter++;
+            RequestCount++;
+            PendingRequestCount++;
             LastRequestTimeStamp = DateTime.UtcNow;
             try {
-                _logger.LogDebug($"{DateTime.Now.ToString()} : Sending request with Method: {method.ToString()} to Resource: {resource}");
+                _logger.LogDebug($"{DateTime.Now.ToString()} : Sending request with Method: {method.ToString()} to Resource: {resourcePath}");
                 using(var response = await _client.SendAsync(request, CancellationTokenSource.Token)) {
                     TransferRetryInfo(response.RequestMessage, context);
-                    return await _apiResponseBuilder.GetApiResponse(response, resource);
+                    return await _apiResponseBuilder.GetApiResponse(response, resourcePath);
                 } 
             } catch (Exception exception) {
                 // Handles communication errors such as "Connection Refused" etc.
                 // Network failures (System.Net.Http.HttpRequestException)
                 // Timeouts (System.IO.IOException)
-                AugmentException(exception, resource, request);
                 TransferRetryInfo(exception, context);
-                return _apiResponseBuilder.GetApiResponse(exception, request, resource);
-            }                      
+                return _apiResponseBuilder.GetApiResponse(exception, request, resourcePath);
+            } finally {
+                PendingRequestCount--;
+            }                    
         }
-
-
-        private void AugmentContext(Polly.Context context, string resource, HttpRequestMessage request) {
-            context["Url"] = new Uri(_client.BaseAddress, resource).ToString();
-            context["Resource"] = resource;
-            context["HttpMethod"] = request.Method.ToString();
-        }
-
-        private void AugmentException(Exception exception, string resource, HttpRequestMessage request) {
-            exception.Data["Url"] = new Uri(_client.BaseAddress, resource).ToString();
-            exception.Data["Resource"] = resource;
-            exception.Data["HttpMethod"] = request.Method.ToString();
-        }
-
 
         // Transfers the RetryInfo from the PolicyExecutionContext into the Request Properties
         private void TransferRetryInfo(HttpRequestMessage request, Polly.Context context) {

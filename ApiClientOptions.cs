@@ -14,6 +14,7 @@ namespace HttpApiClient
         public string BearerToken { get; set; } // Bearer Access Token
         public string UserAgent { get; set; } // The UserAgent string sent in the request
         public double? RequestTimeout { get; set; } // Request timeout in Seconds
+        public bool? AllowAutoRedirect { get; set; }
         public int RetryCount { get; set; } // Setting this to zero disables retries
         public double? RetryWaitDuration { get; set; } // How long to wait on retries in Seconds (only first retry if UseExponentialRetryWaitDuration enabled)
         public int? RetryJitterDuration { get; set; } // Milliseconds

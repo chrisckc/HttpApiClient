@@ -46,7 +46,6 @@ namespace HttpApiClient.ErrorParsers
                 }
                 if (!string.IsNullOrEmpty(errorTitle) || !string.IsNullOrEmpty(errorDetail)) {
                     _logger.LogDebug($"{this.GetType().ToString()} : Known Errors have been found!");
-                    apiResponse.ErrorType = "ErrorReturnedByServer";
                     success = true;
                 }
                     

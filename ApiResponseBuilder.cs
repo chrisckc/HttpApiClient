@@ -21,6 +21,8 @@ namespace HttpApiClient
 
         public bool AlwaysPopulateResponseBody { get; set; }
 
+        public bool PopulateResponseBodyOnParsingError { get; set; }
+
         public ApiResponseBuilder(ILogger logger)
         {
             _logger = logger;
@@ -36,20 +38,25 @@ namespace HttpApiClient
                     // If the content type header says json then try parsing into a JToken (JObject and JArray both inherit from JToken)
                     if (apiResponse.ContentType != null &&
                         (apiResponse.ContentType.ToLower().Contains("application/json") || apiResponse.ContentType.ToLower().Contains("application/problem+json"))) {
-                        apiResponse.Data = await response.Content.ReadAsAsync<JToken>();
-                        //apiResponse.Data = JsonConvert.DeserializeObject<JToken>(await response?.Content?.ReadAsStringAsync());
+                        _logger.LogDebug($"{DateTime.Now.ToString()} : Content-Type header indicates JSON data: {apiResponse.ContentType}");
                         if (AlwaysPopulateResponseBody) apiResponse.Body = await response?.Content?.ReadAsStringAsync();
+                        apiResponse.Data = await response.Content.ReadAsAsync<JToken>();
+                        // Valid JSON value types: boolean (true/false) / null / object / array / number / string  ref: https://tools.ietf.org/html/rfc7159.html#section-3
+                        apiResponse.DataType = apiResponse.Data?.Type.ToString();
+                        //apiResponse.Data = JsonConvert.DeserializeObject<JToken>(await response?.Content?.ReadAsStringAsync());
                     } else {
+                        _logger.LogWarning($"{DateTime.Now.ToString()} : Content-Type header not found, treating response body is string content");
                         apiResponse.Body = await response?.Content?.ReadAsStringAsync();
                     }
                 } catch(Exception ex) {
-                    _logger.LogError($"{DateTime.Now.ToString()} : An exception occurred while parsing the response body from resource: {resource}\nException: {ex.ToString()}");
-                    HandleResponseContentParsingException(apiResponse, ex, response);
+                    HandleResponseBodyParsingException(apiResponse, ex, response);
                 }
 
                 // If status code indicates non-success try and get more info from the response
                 if (!response.IsSuccessStatusCode) {
-                    apiResponse.ErrorTitle = $"Request Failed with Status: {apiResponse.StatusCode} ({apiResponse.StatusText})";
+                    string errorTitle = $"Failure StatusCode: {apiResponse.StatusCode} ({apiResponse.StatusText})";
+                    _logger.LogError($"{DateTime.Now.ToString()} : {errorTitle}");
+                    apiResponse.ErrorTitle = errorTitle;
                     apiResponse.ErrorType = "FailureStatusCode";
                     if (apiResponse.Data != null) {  // If we have an object (a JSON response)
                         _logger.LogError($"{DateTime.Now.ToString()} : StatusCode indicates Failure : Response Object:\n{apiResponse.Data}");
@@ -75,6 +82,15 @@ namespace HttpApiClient
             _logger.LogDebug($"{DateTime.Now.ToString()} : Response Success: {IsSuccess}");
             if (response != null) {
                 // Populate the ApiResponse object
+                apiResponse.Url = response.RequestMessage?.RequestUri?.AbsoluteUri?.ToString();
+                string originalUrl = (string)response.RequestMessage.GetOriginalRequestUrl();
+                // Check if redirected
+                if (apiResponse.Url != originalUrl) {
+                    apiResponse.Redirected = true;
+                     apiResponse.OriginalUrl = originalUrl;
+                     apiResponse.OriginalMethod = (string)response.RequestMessage.GetOriginalRequestMethod();
+                    _logger.LogWarning($"{DateTime.Now.ToString()} : The Request was Redirected from: {apiResponse.OriginalUrl} \nto: {apiResponse.Url}");
+                }
                 _logger.LogDebug($"{DateTime.Now.ToString()} : Response Status: {(int)response.StatusCode} ({response.StatusCode.ToString()})");
                 string contentType = response.Content?.Headers?.ContentType?.ToString();
                 //string contentType = GetHeaderValue(response.Headers, "Content-Type");
@@ -82,7 +98,6 @@ namespace HttpApiClient
                 _logger.LogDebug($"{DateTime.Now.ToString()} : Response Headers:\n{response?.Headers?.ToString()}");
                 apiResponse.StatusCode = (int)response.StatusCode;
                 apiResponse.StatusText = response.StatusCode.ToString();
-                apiResponse.Url = response.RequestMessage?.RequestUri?.AbsoluteUri?.ToString();
                 apiResponse.Method = response.RequestMessage?.Method?.ToString();
                 apiResponse.Headers = response.Headers;
                 apiResponse.RetryAfter = GetServerWaitDuration(response.Headers);
@@ -93,19 +108,23 @@ namespace HttpApiClient
             return apiResponse;
         }
 
-        private async void HandleResponseContentParsingException(ApiResponse apiResponse, Exception exception, HttpResponseMessage response) {
+        private async void HandleResponseBodyParsingException(ApiResponse apiResponse, Exception exception, HttpResponseMessage response) {
+            string errorDetail = $"Error occurred while parsing the response body with content type: {apiResponse.ContentType} from resource: {apiResponse.Resource} \nError: {exception.Message}";
+            _logger.LogError($"{DateTime.Now.ToString()} : errorDetail");
             apiResponse.Exception = exception;
-            apiResponse.ErrorType = $"ResponseBodyParsingException";
-            apiResponse.ErrorTitle = $"Exception occurred while parsing response body with content type: {apiResponse.ContentType}";
-            // Try just reading the content as a string regardless of the content type
-            try {
-                apiResponse.Body = await response?.Content?.ReadAsStringAsync();
-                apiResponse.ErrorDetail = $"The response body was parsed a string instead. Refer to the Exception property for details of the error";
-            } catch (Exception ex) {
-                _logger.LogDebug($"Exception occurred while attempting to parse response body as a string:\n{ex.ToString()}");
-                apiResponse.ErrorDetail = $"The response body could not even be parsed as a string. Refer to the Exception property for details of the error";
+            apiResponse.ErrorTitle = $"Response Body Parsing Error";
+            apiResponse.ErrorType = $"ResponseBodyParsingError";
+            apiResponse.ErrorDetail = errorDetail;
+            if (PopulateResponseBodyOnParsingError) {
+                // Try just reading the content as a string regardless of the content type
+                try {
+                    apiResponse.Body = await response?.Content?.ReadAsStringAsync();
+                    apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nThe response body was parsed a string instead. Refer to the Exception property for details of the error";
+                } catch (Exception ex) {
+                    _logger.LogDebug($"Exception occurred while attempting to parse response body as a string:\n{ex.ToString()}");
+                    apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nThe response body could not even be parsed as a string. Refer to the Exception property for details of the error";
+                }
             }
-            apiResponse.ErrorTitle = $"Exception occurred while parsing the response body with content type: {apiResponse.ContentType}";
         }
 
         // Look for known error structures in the response JSON
@@ -117,23 +136,31 @@ namespace HttpApiClient
         }
 
         public ApiResponse GetApiResponse(Exception exception, HttpRequestMessage request, string resource) {
-            _logger.LogError($"{DateTime.Now.ToString()} : An exception occurred {request.Method}ing resource: {resource}\nException: {exception.ToString()}");
             ApiResponse apiResponse = new ApiResponse(false, resource);
             apiResponse.Exception = exception;
             apiResponse.Url = request?.RequestUri?.AbsoluteUri?.ToString();
+            apiResponse.OriginalUrl = (string)request.GetOriginalRequestUrl();
+            if (apiResponse.Url != apiResponse.OriginalUrl) {
+                apiResponse.Redirected = true;
+                _logger.LogWarning($"{DateTime.Now.ToString()} : The Request was Redirected from: {apiResponse.OriginalUrl} \nto: {apiResponse.Url}");
+            }
+            apiResponse.OriginalMethod = (string)request.GetOriginalRequestMethod();
             apiResponse.Method = request?.Method?.ToString();
-            if (exception is System.OperationCanceledException) {
-                apiResponse.ErrorTitle = $"The request was cancelled while {apiResponse.Method}ing resource: {resource}";
+            if (exception is System.OperationCanceledException || exception is TaskCanceledException) {
+                apiResponse.ErrorTitle = "Request Cancelled";
+                apiResponse.ErrorDetail = $"The request was Cancelled while sending {apiResponse.Method} request to resource: {resource}";
             } else {
-                apiResponse.ErrorTitle = $"Exception occurred while {apiResponse.Method}ing resource: {resource}";
+                apiResponse.ErrorTitle = "Request Error";
+                apiResponse.ErrorDetail = $"Error occurred while sending {apiResponse.Method} request to resource: {resource}";
             }
             if (exception.InnerException != null) {
-                apiResponse.ErrorType = $"{exception.GetType().ToString()}\n{exception.InnerException.GetType().ToString()}";
-                apiResponse.ErrorDetail = $"{exception.Message}\n{exception.InnerException.Message}";
+                apiResponse.ErrorType = $"{exception.GetType().ToString()} | {exception.InnerException.GetType().ToString()}";
+                apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nError: {exception.Message} \n{exception.InnerException.Message}";
             } else {
                 apiResponse.ErrorType = $"{exception.GetType().ToString()}";
-                apiResponse.ErrorDetail = exception.Message;
+                apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nError: {exception.Message}";
             }
+            _logger.LogError($"{DateTime.Now.ToString()} : {apiResponse.ErrorDetail}");
             apiResponse.RetryInfo = exception.GetRetryInfo();
             return apiResponse;
         }
