@@ -94,9 +94,9 @@ namespace HttpApiClient
 
         public virtual async Task<ApiResponse> SendAsync(HttpMethod method, string resourcePath, object obj) {
             try {
-                _logger.LogDebug($"{DateTime.Now.ToString()} : Serializing Object of Type: {obj?.GetType()?.ToString()}");
                 StringContent stringContent = null;
                 if (obj != null) {
+                    _logger.LogDebug($"{DateTime.Now.ToString()} : Serializing Object of Type: {obj?.GetType()?.ToString()}");
                     var dataAsString = JsonConvert.SerializeObject(obj);
                     stringContent = new StringContent(dataAsString, System.Text.Encoding.UTF8, "application/json");
                 }

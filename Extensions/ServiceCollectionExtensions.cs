@@ -10,18 +10,18 @@ namespace HttpApiClient.Extensions
 {
     public static class ServiceCollectionExtensions
     {        
-        public static IHttpClientBuilder AddApiClient<TClient>(this IServiceCollection services, Action<ApiClientOptions<TClient>> configureClient)
+        public static IHttpClientBuilder AddApiClient<TClient>(this IServiceCollection services, Action<ApiClientOptions<TClient>> configureClient = null)
             where TClient : ApiClient<TClient>
         {
             return AddApiClient<TClient, ApiClientOptions<TClient>>(services, configureClient);
         }
 
-        public static IHttpClientBuilder AddApiClient<TClient, TOptions>(this IServiceCollection services, Action<TOptions> configureClient)
+        public static IHttpClientBuilder AddApiClient<TClient, TOptions>(this IServiceCollection services, Action<TOptions> configureClient = null)
             where TClient : ApiClient<TClient>
             where TOptions : ApiClientOptions<TClient>, new()
         {
             if (services == null) throw new ArgumentNullException(nameof(services));
-            if (configureClient == null) throw new ArgumentNullException(nameof(configureClient));
+            //if (configureClient == null) throw new ArgumentNullException(nameof(configureClient));
 
             // I Preferred to just call Invoke on configureClient rather than add another service just to retrieve it later!
             //services.Configure<TOptions>(configureClient);
@@ -50,7 +50,7 @@ namespace HttpApiClient.Extensions
                 }
 
                 // The configuration actions passed in to this method override the configuration registered in DI
-                configureClient.Invoke(options);
+                configureClient?.Invoke(options);
                 
                 // Populate the error parsers
                 IEnumerable<IKnownErrorParser<TClient>> errorParsers = provider.GetServices<IKnownErrorParser<TClient>>();

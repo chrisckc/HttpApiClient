@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -45,8 +46,15 @@ namespace HttpApiClient
                         apiResponse.DataType = apiResponse.Data?.Type.ToString();
                         //apiResponse.Data = JsonConvert.DeserializeObject<JToken>(await response?.Content?.ReadAsStringAsync());
                     } else {
-                        _logger.LogWarning($"{DateTime.Now.ToString()} : Content-Type header not found, treating response body is string content");
-                        apiResponse.Body = await response?.Content?.ReadAsStringAsync();
+                        if (apiResponse.ContentType == null) {
+                            _logger.LogWarning($"{DateTime.Now.ToString()} : Content-Type header not found, treating response body is string content");
+                        }
+                        Stream stream = await response?.Content?.ReadAsStreamAsync();
+                        apiResponse.BodyStream = new MemoryStream();
+                        // The stream needs to be copied as it will be disposed when the HttpResponseMessage is disposed
+                        await stream.CopyToAsync(apiResponse.BodyStream);
+                        apiResponse.BodyStream.Seek(0, SeekOrigin.Begin); // The stream needs to be rewound back to the beginning
+                        if (AlwaysPopulateResponseBody) apiResponse.Body = await response?.Content?.ReadAsStringAsync();
                     }
                 } catch(Exception ex) {
                     HandleResponseBodyParsingException(apiResponse, ex, response);
@@ -110,7 +118,8 @@ namespace HttpApiClient
 
         private async void HandleResponseBodyParsingException(ApiResponse apiResponse, Exception exception, HttpResponseMessage response) {
             string errorDetail = $"Error occurred while parsing the response body with content type: {apiResponse.ContentType} from resource: {apiResponse.Resource} \nError: {exception.Message}";
-            _logger.LogError($"{DateTime.Now.ToString()} : errorDetail");
+            _logger.LogError($"{DateTime.Now.ToString()} : {errorDetail}");
+            apiResponse.Success = false;
             apiResponse.Exception = exception;
             apiResponse.ErrorTitle = $"Response Body Parsing Error";
             apiResponse.ErrorType = $"ResponseBodyParsingError";

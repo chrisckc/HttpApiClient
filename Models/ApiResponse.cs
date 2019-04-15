@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Net.Http.Headers;
 using Newtonsoft.Json.Linq;
 
@@ -21,6 +22,7 @@ namespace HttpApiClient.Models
         public JToken Data { get; set; }
         public string DataType { get; set; }  // Type of JToken Data: Object, Array, String, Integer, Boolean, Null
         public string Body { get; set; }
+        public Stream BodyStream { get; set; }
         public Exception Exception { get; set; }
         public string ErrorTitle { get; set; }
         public string ErrorType { get; set; }
