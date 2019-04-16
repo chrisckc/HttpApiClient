@@ -18,6 +18,8 @@ namespace HttpApiClient
         protected HttpClient _client;
         protected readonly ILogger<TClient> _logger;
         private ApiResponseBuilder<TClient> _apiResponseBuilder;
+
+        protected ApiClientOptions<TClient> _options;
         public CancellationTokenSource CancellationTokenSource { get; set; }
         public int PendingRequestCount { get; set; }
         public int RequestCount { get; set; }
@@ -26,6 +28,7 @@ namespace HttpApiClient
         public ApiClient(HttpClient client, ApiClientOptions<TClient> options, ILogger<TClient> logger)
         {
             _client = client;
+            _options = options;
             _logger = logger;
 
             // Get class name for demo purposes, the class name is shown in the log output anyway
@@ -50,6 +53,17 @@ namespace HttpApiClient
         public void clearBearerToken(string bearerToken)
         {
             _client.DefaultRequestHeaders.Remove("Authorization");
+        }
+
+        // Set the Cookie
+        public void SetCookie(string cookie)
+        {
+            _client.DefaultRequestHeaders.Add("Cookie", cookie);
+        }
+
+        public void clearCookie(string bearerToken)
+        {
+            _client.DefaultRequestHeaders.Remove("Cookie");
         }
 
         public virtual async Task<ApiResponse> GetResource(string resourcePath, TimeSpan? delay = null) {

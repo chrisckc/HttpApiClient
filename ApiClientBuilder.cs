@@ -96,13 +96,20 @@ namespace HttpApiClient
                 if (!string.IsNullOrEmpty(_options.BearerToken)) {
                     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _options.BearerToken);
                 }
+                if (!string.IsNullOrEmpty(_options.Cookie)) {
+                    client.DefaultRequestHeaders.Add("Cookie", _options.Cookie);
+                }
                 client.Timeout = Timeout.InfiniteTimeSpan; // Required when using the TimeoutHandler     
             })
             // Add the Timeout Handler so we can determine when a request actually times out
+            // AutomaticDecompression, on .NET Core 2.0, the default is now DecompressionMethods.None;
+            // Note about cookies: https://github.com/Microsoft/dotnet/issues/395
             .ConfigurePrimaryHttpMessageHandler(() => new TimeoutHandler(_logger) {
                 DefaultTimeout = TimeSpan.FromSeconds(_options.RequestTimeout.Value),
                 InnerHandler = new HttpClientHandler() {
-                    AllowAutoRedirect = _options.AllowAutoRedirect.Value
+                    UseCookies = false, // allows Cookie to be set via DefaultRequestHeaders
+                    AllowAutoRedirect = _options.AllowAutoRedirect.Value,
+                    AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip
                 }
             })
             // Configure Polly

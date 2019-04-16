@@ -12,6 +12,7 @@ namespace HttpApiClient
         public string BasicAuthUsername { get; set; } // Basic Authentication Scheme username
         public string BasicAuthPassword { get; set; } // Basic Authentication Scheme username
         public string BearerToken { get; set; } // Bearer Access Token
+        public string Cookie { get; set; } // Support Cookies
         public string UserAgent { get; set; } // The UserAgent string sent in the request
         public double? RequestTimeout { get; set; } // Request timeout in Seconds
         public bool? AllowAutoRedirect { get; set; }
