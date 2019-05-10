@@ -130,7 +130,7 @@ namespace HttpApiClient
                     apiResponse.Body = await response?.Content?.ReadAsStringAsync();
                     apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nThe response body was parsed a string instead. Refer to the Exception property for details of the error";
                 } catch (Exception ex) {
-                    _logger.LogDebug($"Exception occurred while attempting to parse response body as a string:\n{ex.ToString()}");
+                    _logger.LogError($"Exception occurred while attempting to parse response body as a string:\n{ex.ToString()}");
                     apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nThe response body could not even be parsed as a string. Refer to the Exception property for details of the error";
                 }
             }
@@ -146,31 +146,44 @@ namespace HttpApiClient
 
         public ApiResponse GetApiResponse(Exception exception, HttpRequestMessage request, string resource) {
             ApiResponse apiResponse = new ApiResponse(false, resource);
-            apiResponse.Exception = exception;
-            apiResponse.Url = request?.RequestUri?.AbsoluteUri?.ToString();
-            apiResponse.OriginalUrl = (string)request.GetOriginalRequestUrl();
-            if (apiResponse.Url != apiResponse.OriginalUrl) {
-                apiResponse.Redirected = true;
-                _logger.LogWarning($"{DateTime.Now.ToString()} : The Request was Redirected from: {apiResponse.OriginalUrl} \nto: {apiResponse.Url}");
+            try {
+                apiResponse.Method = request?.Method?.ToString();
+                apiResponse.Exception = exception;
+                if (exception is System.OperationCanceledException || exception is TaskCanceledException) {
+                    apiResponse.ErrorTitle = "Request Cancelled";
+                    apiResponse.ErrorDetail = $"The request was Cancelled while sending {apiResponse.Method} request to resource: \"{resource}\"";
+                } else {
+                    apiResponse.ErrorTitle = "Request Error";
+                    apiResponse.ErrorDetail = $"Error occurred while sending {apiResponse.Method} request to resource: \"{resource}\"";
+                }
+                if (exception.InnerException != null) {
+                    apiResponse.ErrorType = $"{exception.GetType().Name} | {exception.InnerException.GetType().Name}";
+                    apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nException: {exception.Message} \n{exception.InnerException.Message}";
+                } else {
+                    apiResponse.ErrorType = $"{exception.GetType().Name}";
+                    apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nException: {exception.Message}";
+                }
+                _logger.LogError($"{DateTime.Now.ToString()} : {apiResponse.ErrorDetail}");
+                apiResponse.RetryInfo = exception.GetRetryInfo();
+                apiResponse.OriginalMethod = (string)request.GetOriginalRequestMethod();
+                if (request?.RequestUri != null && request.RequestUri.IsAbsoluteUri) {
+                    apiResponse.Url = request?.RequestUri?.AbsoluteUri?.ToString();
+                } else {
+                    apiResponse.Url = request?.RequestUri?.OriginalString;
+                }
+                apiResponse.OriginalUrl = (string)request.GetOriginalRequestUrl();
+                if (apiResponse.OriginalUrl != null && apiResponse.Url != apiResponse.OriginalUrl) {
+                    apiResponse.Redirected = true;
+                    _logger.LogWarning($"{DateTime.Now.ToString()} : The Request was Redirected from: {apiResponse.OriginalUrl} \nto: {apiResponse.Url}");
+                }
+            } catch (Exception ex) {
+                _logger.LogError($"Exception occurred during GetApiResponse: \n{ex.ToString()}");
+                if (apiResponse.ErrorDetail != null) {
+                    apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nThe ApiResponse object could not be fully generated. Refer to the Exception property for details of the error";
+                } else {
+                    apiResponse.ErrorDetail = "The ApiResponse object could not be fully generated. Refer to the Exception property for details of the error";
+                }
             }
-            apiResponse.OriginalMethod = (string)request.GetOriginalRequestMethod();
-            apiResponse.Method = request?.Method?.ToString();
-            if (exception is System.OperationCanceledException || exception is TaskCanceledException) {
-                apiResponse.ErrorTitle = "Request Cancelled";
-                apiResponse.ErrorDetail = $"The request was Cancelled while sending {apiResponse.Method} request to resource: {resource}";
-            } else {
-                apiResponse.ErrorTitle = "Request Error";
-                apiResponse.ErrorDetail = $"Error occurred while sending {apiResponse.Method} request to resource: {resource}";
-            }
-            if (exception.InnerException != null) {
-                apiResponse.ErrorType = $"{exception.GetType().ToString()} | {exception.InnerException.GetType().ToString()}";
-                apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nError: {exception.Message} \n{exception.InnerException.Message}";
-            } else {
-                apiResponse.ErrorType = $"{exception.GetType().ToString()}";
-                apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nError: {exception.Message}";
-            }
-            _logger.LogError($"{DateTime.Now.ToString()} : {apiResponse.ErrorDetail}");
-            apiResponse.RetryInfo = exception.GetRetryInfo();
             return apiResponse;
         }
 

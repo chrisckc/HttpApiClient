@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Net.Http.Headers;
+using System.Text;
 using Newtonsoft.Json.Linq;
 
 namespace HttpApiClient.Models
@@ -10,7 +11,7 @@ namespace HttpApiClient.Models
         public bool Success { get; set; }
         public string Resource { get; set; }
         public string Url { get; set; }
-         public string OriginalUrl { get; set; }  // The Url before any redirects
+        public string OriginalUrl { get; set; }  // The Url before any redirects
         public string Method { get; set; }  // Http Method
         public string OriginalMethod { get; set; } // The Http Method before any redirects
         public int? StatusCode { get; set; }
@@ -35,6 +36,26 @@ namespace HttpApiClient.Models
         {
             Success = success;
             Resource  = resource;
+        }
+
+        public string GetErrorText() {
+            StringBuilder sb = new StringBuilder();
+            if (!string.IsNullOrEmpty(ErrorTitle)) {
+                sb.AppendLine($"{ErrorTitle} ");
+            }
+            if (!string.IsNullOrEmpty(ErrorType)) {
+                sb.AppendLine($"ErrorType: {ErrorType} ");
+            }
+            if (!string.IsNullOrEmpty(ErrorDetail)) {
+                sb.AppendLine($"ErrorDetail: {ErrorDetail} ");
+            }
+            if (!string.IsNullOrEmpty(ErrorInstance)) {
+                sb.AppendLine($"ErrorInstance: {ErrorInstance} ");
+            }
+            if (sb.Length > 0) {
+                return sb.ToString();
+            }
+            return null;
         }
     }
 }
