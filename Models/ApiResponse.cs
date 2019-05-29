@@ -40,6 +40,7 @@ namespace HttpApiClient.Models
 
         public string GetErrorText() {
             StringBuilder sb = new StringBuilder();
+            sb.AppendLine($"Resource: {Resource}");
             if (!string.IsNullOrEmpty(ErrorTitle)) {
                 sb.AppendLine($"{ErrorTitle} ");
             }
