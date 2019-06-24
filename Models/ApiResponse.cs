@@ -40,7 +40,6 @@ namespace HttpApiClient.Models
 
         public string GetErrorText() {
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine($"Resource: {Resource}");
             if (!string.IsNullOrEmpty(ErrorTitle)) {
                 sb.AppendLine($"{ErrorTitle} ");
             }
@@ -54,7 +53,7 @@ namespace HttpApiClient.Models
                 sb.AppendLine($"ErrorInstance: {ErrorInstance} ");
             }
             if (sb.Length > 0) {
-                return sb.ToString();
+                return $"Resource: {Resource}{Environment.NewLine}{sb.ToString()}";
             }
             return null;
         }
