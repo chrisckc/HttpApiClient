@@ -47,7 +47,7 @@ namespace HttpApiClient
                         //apiResponse.Data = JsonConvert.DeserializeObject<JToken>(await response?.Content?.ReadAsStringAsync());
                     } else {
                         if (apiResponse.ContentType == null) {
-                            _logger.LogWarning($"{DateTime.Now.ToString()} : Content-Type header not found, treating response body is string content");
+                            _logger.LogWarning($"{DateTime.Now.ToString()} : Content-Type header not found, treating response body as string content");
                         }
                         Stream stream = await response?.Content?.ReadAsStreamAsync();
                         apiResponse.BodyStream = new MemoryStream();
