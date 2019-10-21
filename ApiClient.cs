@@ -44,6 +44,18 @@ namespace HttpApiClient
             CancellationTokenSource = new CancellationTokenSource();
         }
 
+        public void SetBasicAuth(string username, string password)
+        {
+            string basicAuth = string.Format("{0}:{1}", username, password);
+            string encodedAuth = Convert.ToBase64String(System.Text.ASCIIEncoding.ASCII.GetBytes(basicAuth));
+            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", encodedAuth);
+        }
+
+        public void clearBasicAuth(string bearerToken)
+        {
+            _client.DefaultRequestHeaders.Remove("Authorization");
+        }
+
         // Set the OAuth 2.0 bearer token
         public void SetBearerToken(string bearerToken)
         {
