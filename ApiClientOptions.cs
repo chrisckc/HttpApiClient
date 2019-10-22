@@ -14,6 +14,11 @@ namespace HttpApiClient
         public string BearerToken { get; set; } // Bearer Access Token
         public string Cookie { get; set; } // Support Cookies
         public string UserAgent { get; set; } // The UserAgent string sent in the request
+        public bool SerializeNullValues { get; set; }
+        public bool SerializeEnumsAsStrings { get; set; }
+        public bool SerializePropertiesAsCamelCase { get; set; }
+        public bool SerializeUseFormattingIndented { get; set; }
+        public bool IgnoreServerCertificateErrors { get; set; } // Useful for development and debugging, do not use in production
         public double? RequestTimeout { get; set; } // Request timeout in Seconds
         public bool? AllowAutoRedirect { get; set; }
         public int RetryCount { get; set; } // Setting this to zero disables retries

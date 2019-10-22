@@ -83,6 +83,16 @@ namespace HttpApiClient
         }
 
         public IHttpClientBuilder ConfigureApiClient() {
+            // Create the custom HttpClientHandler
+            var handler = new HttpClientHandler() {
+                UseCookies = false, // allows Cookie to be set via DefaultRequestHeaders
+                AllowAutoRedirect = _options.AllowAutoRedirect.Value,
+                AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip
+            };
+            if (_options.IgnoreServerCertificateErrors) {
+                handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => { return true; };
+            }
+
             // Add the HttpClient
             return _services.AddHttpClient<TClient>(client => {
                 client.BaseAddress = _options.BaseUrl;
@@ -106,11 +116,7 @@ namespace HttpApiClient
             // Note about cookies: https://github.com/Microsoft/dotnet/issues/395
             .ConfigurePrimaryHttpMessageHandler(() => new TimeoutHandler(_logger) {
                 DefaultTimeout = TimeSpan.FromSeconds(_options.RequestTimeout.Value),
-                InnerHandler = new HttpClientHandler() {
-                    UseCookies = false, // allows Cookie to be set via DefaultRequestHeaders
-                    AllowAutoRedirect = _options.AllowAutoRedirect.Value,
-                    AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip
-                }
+                InnerHandler = handler
             })
             // Configure Polly
             //.AddPolicyHandler(waitAndRetryPolicy)
