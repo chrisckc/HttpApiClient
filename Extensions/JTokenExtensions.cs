@@ -10,7 +10,12 @@ namespace HttpApiClient.Extensions {
             try {
                 JToken token = obj.SelectToken(key);
                 if (token != null) {
-                    return token.ToString();
+                    if (token.Type ==  JTokenType.String) {
+                        return token.ToObject<string>();
+                    } else {
+                        // JToken.ToString() Returns the indented JSON for this token
+                        return token.ToString();
+                    }
                 }
                 return defaultSubstitute;
             } catch(Exception ex) {

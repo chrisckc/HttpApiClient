@@ -10,13 +10,13 @@ namespace HttpApiClient.Extensions
 {
     public static class ServiceCollectionExtensions
     {        
-        public static IHttpClientBuilder AddApiClient<TClient>(this IServiceCollection services, Action<ApiClientOptions<TClient>> configureClient = null)
+        public static IHttpClientBuilder AddApiClient<TClient>(this IServiceCollection services, Action<ApiClientOptions<TClient>> configureClient = null, IKnownErrorParser<TClient> errorParser = null)
             where TClient : ApiClient<TClient>
         {
             return AddApiClient<TClient, ApiClientOptions<TClient>>(services, configureClient);
         }
 
-        public static IHttpClientBuilder AddApiClient<TClient, TOptions>(this IServiceCollection services, Action<TOptions> configureClient = null)
+        public static IHttpClientBuilder AddApiClient<TClient, TOptions>(this IServiceCollection services, Action<TOptions> configureClient = null, IKnownErrorParser<TClient> errorParser = null)
             where TClient : ApiClient<TClient>
             where TOptions : ApiClientOptions<TClient>, new()
         {
@@ -52,11 +52,20 @@ namespace HttpApiClient.Extensions
                 // The configuration actions passed in to this method override the configuration registered in DI
                 configureClient?.Invoke(options);
                 
-                // Populate the error parsers
-                IEnumerable<IKnownErrorParser<TClient>> errorParsers = provider.GetServices<IKnownErrorParser<TClient>>();
-                options.KnownErrorParsers = errorParsers.ToList();
+                if (errorParser != null) {
+                    // Use the specified error parser first if provided
+                    options.KnownErrorParsers = new List<IKnownErrorParser<TClient>>();
+                    options.KnownErrorParsers.Add(errorParser);
+                } else {
+                    // Populate any error parsers from the Service collection
+                    IEnumerable<IKnownErrorParser<TClient>> errorParsers = provider.GetServices<IKnownErrorParser<TClient>>();
+                    options.KnownErrorParsers = errorParsers.ToList();
+                }
+                
                 // Add the Problem Details error parser after the supplied ones
-                options.KnownErrorParsers.Add(new ProblemDetailsErrorParser<TClient>(logger));
+                // This will be the last one in the list, the default fallback error parser
+                var problemDetailsErrorParserLogger = provider.GetRequiredService<ILogger<ProblemDetailsErrorParser<TClient>>>();
+                options.KnownErrorParsers.Add(new ProblemDetailsErrorParser<TClient>(problemDetailsErrorParserLogger));
                 
                 // Create the builder and configure
                 var builder = new ApiClientBuilder<TClient>(services, options, logger);

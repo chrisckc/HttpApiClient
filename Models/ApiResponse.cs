@@ -20,15 +20,16 @@ namespace HttpApiClient.Models
         public string ContentType { get; set; }
         public HttpResponseHeaders Headers { get; set; }
         public RetryInfo RetryInfo { get; set; }
-        public JToken Data { get; set; }
+        public JToken Data { get; set; } // JToken parsed from the response body
         public string DataType { get; set; }  // Type of JToken Data: Object, Array, String, Integer, Boolean, Null
-        public string Body { get; set; }
-        public Stream BodyStream { get; set; }
+        public string Body { get; set; } // The raw response body as a string
+        public Stream BodyStream { get; set; } // The raw response body as a Stream
         public Exception Exception { get; set; }
         public string ErrorTitle { get; set; }
         public string ErrorType { get; set; }
         public string ErrorDetail { get; set; }
         public string ErrorInstance { get; set; }
+        public bool BodyParsingFailed { get; set; } // If an error occurred while parsing the response body
         public TimeSpan? RetryAfter { get; set; }
         public DateTimeOffset Timestamp { get; set; }
 
@@ -41,19 +42,19 @@ namespace HttpApiClient.Models
         public string GetErrorText() {
             StringBuilder sb = new StringBuilder();
             if (!string.IsNullOrEmpty(ErrorTitle)) {
-                sb.AppendLine($"{ErrorTitle} ");
+                sb.AppendLine($"ErrorTitle: \"{ErrorTitle}\" ");
             }
             if (!string.IsNullOrEmpty(ErrorType)) {
-                sb.AppendLine($"ErrorType: {ErrorType} ");
+                sb.AppendLine($"ErrorType: \"{ErrorType}\" ");
             }
             if (!string.IsNullOrEmpty(ErrorDetail)) {
-                sb.AppendLine($"ErrorDetail: {ErrorDetail} ");
+                sb.AppendLine($"ErrorDetail: \"{ErrorDetail}\" ");
             }
             if (!string.IsNullOrEmpty(ErrorInstance)) {
-                sb.AppendLine($"ErrorInstance: {ErrorInstance} ");
+                sb.AppendLine($"ErrorInstance: \"{ErrorInstance}\" ");
             }
             if (sb.Length > 0) {
-                return $"Resource: {Resource}{Environment.NewLine}{sb.ToString()}";
+                return $"{sb.ToString()} {Environment.NewLine} Error occurred while sending \"{Method}\" request to resource: {Resource}";
             }
             return null;
         }

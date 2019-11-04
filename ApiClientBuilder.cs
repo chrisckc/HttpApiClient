@@ -53,10 +53,13 @@ namespace HttpApiClient
                 _options.DefaultTooManyRequestsRetryDuration = 60;  // 60 seconds
             }
             if (!_options.UseExponentialRetryWaitDuration.HasValue) {
-                _options.UseExponentialRetryWaitDuration = false;
+                _options.UseExponentialRetryWaitDuration = false; // default to false
             }
             if (!_options.AlwaysPopulateResponseBody.HasValue) {
-                _options.AlwaysPopulateResponseBody = false;
+                _options.AlwaysPopulateResponseBody = false; // default to false
+            }
+            if (!_options.PopulateResponseBodyOnParsingError.HasValue) {
+                _options.PopulateResponseBodyOnParsingError = true; // default to true
             }
             // Set a sensible list of defaults for status codes to retry on
             if (_options.HttpStatusCodesToRetry ==  null) {

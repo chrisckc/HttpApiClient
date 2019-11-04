@@ -27,6 +27,7 @@ namespace HttpApiClient
         public double? DefaultTooManyRequestsRetryDuration { get; set; } // Seconds
         public bool? UseExponentialRetryWaitDuration { get; set; } // Use Optimistic concurrency control (OCC) style increasing back-off (wait) and retries
         public bool? AlwaysPopulateResponseBody { get; set; } // Always put the response body into the ApiResponse.Body, even when content-type is application/json
+        public bool? PopulateResponseBodyOnParsingError  { get; set; } // If there is a parsing error such as parsing JSON response then Populate the response body
         public List<HttpStatusCode> HttpStatusCodesToRetry { get; set; } // List of Http Status Codes to Retry on
         public List<HttpMethod> HttpMethodsToRetry { get; set; } // List of Http Methods to enable Retries for
         public List<IKnownErrorParser<TClient>> KnownErrorParsers { get; set; } // KnownErrorParsers to use when parsing errors returned from the Api

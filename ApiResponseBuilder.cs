@@ -62,10 +62,18 @@ namespace HttpApiClient
 
                 // If status code indicates non-success try and get more info from the response
                 if (!response.IsSuccessStatusCode) {
-                    string errorTitle = $"Failure StatusCode: {apiResponse.StatusCode} ({apiResponse.StatusText})";
-                    _logger.LogError($"{DateTime.Now.ToString()} : {errorTitle}");
-                    apiResponse.ErrorTitle = errorTitle;
-                    apiResponse.ErrorType = "FailureStatusCode";
+                    // Get the value of the "WWW-Authenticate" header
+                    var wwwAuthHeader = apiResponse.Headers.WwwAuthenticate.FirstOrDefault();
+                    string authMessage = wwwAuthHeader?.ToString();
+                    if (!string.IsNullOrEmpty(authMessage)) {
+                        apiResponse.ErrorTitle = $"Authentication Failure: {authMessage} StatusCode: {apiResponse.StatusCode} ({apiResponse.StatusText})";
+                        apiResponse.ErrorType = "AuthenticationError";
+                        _logger.LogDebug($"{this.GetType().ToString()} : Authentication Error message has been found!");
+                    } else {
+                        apiResponse.ErrorTitle = $"Failure StatusCode: {apiResponse.StatusCode} ({apiResponse.StatusText})";
+                        apiResponse.ErrorType = "FailureStatusCode";
+                    }
+                    _logger.LogError($"{DateTime.Now.ToString()} : ErrorTitle: {apiResponse.ErrorTitle}");
                     if (apiResponse.Data != null) {  // If we have an object (a JSON response)
                         _logger.LogError($"{DateTime.Now.ToString()} : StatusCode indicates Failure : Response Object:\n{apiResponse.Data}");
                         // Try to extract some error details from the JSON response
@@ -75,7 +83,7 @@ namespace HttpApiClient
                         // Just add a preview of the response body (could be some large html content)
                         apiResponse.ErrorDetail = apiResponse.Body.Truncate(100);
                     } else {
-                        _logger.LogError($"{DateTime.Now.ToString()} : StatusCode indicates Failure: Response Body is empty!");
+                        _logger.LogError($"{DateTime.Now.ToString()} : StatusCode indicates Failure: Response Body is empty, no additional error information is available");
                     }
                 }
                 return apiResponse;
@@ -124,6 +132,7 @@ namespace HttpApiClient
             apiResponse.ErrorTitle = $"Response Body Parsing Error";
             apiResponse.ErrorType = $"ResponseBodyParsingError";
             apiResponse.ErrorDetail = errorDetail;
+            apiResponse.BodyParsingFailed = true;
             if (PopulateResponseBodyOnParsingError) {
                 // Try just reading the content as a string regardless of the content type
                 try {
@@ -139,7 +148,7 @@ namespace HttpApiClient
         // Look for known error structures in the response JSON
         private void ParseKnownErrors(ApiResponse apiResponse) {
             foreach (IKnownErrorParser<TClient> parser in KnownErrorParsers) {
-                // Stop on the first parser that found something
+                // Stop on the first parser that found something, the one that returns true
                 if (parser.ParseKnownErrors(apiResponse)) break;
             }
         }
