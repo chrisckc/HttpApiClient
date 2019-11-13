@@ -62,6 +62,7 @@ namespace HttpApiClient
                 _options.PopulateResponseBodyOnParsingError = true; // default to true
             }
             // Set a sensible list of defaults for status codes to retry on
+            // Can be set in the appsettings.json eg. "HttpStatusCodesToRetry": [ 408, 429 ],
             if (_options.HttpStatusCodesToRetry ==  null) {
                 _options.HttpStatusCodesToRetry = new List<HttpStatusCode>() {
                     HttpStatusCode.RequestTimeout, // 408
@@ -73,14 +74,16 @@ namespace HttpApiClient
                 };
             }
             // Set a sensible list of defaults for http methods to retry on
+            // Can be set in the appsettings.json eg. "HttpMethodsToRetry": [ "GET", "DELETE", "OPTIONS", "HEAD", "TRACE", "POST", "PUT" ],
             // These are the only safe defaults unless familiar with the remote API behaviour
             if (_options.HttpMethodsToRetry ==  null) {
-                _options.HttpMethodsToRetry = new List<HttpMethod>() {
-                    HttpMethod.Get,
-                    HttpMethod.Delete,
-                    HttpMethod.Options,
-                    HttpMethod.Head,
-                    HttpMethod.Trace
+                // Don't include POST and PUT by default
+                _options.HttpMethodsToRetry = new List<string>() {
+                    HttpMethod.Get.ToString(),
+                    HttpMethod.Delete.ToString(),
+                    HttpMethod.Options.ToString(),
+                    HttpMethod.Head.ToString(),
+                    HttpMethod.Trace.ToString()
                 };
             }
         }
@@ -126,7 +129,7 @@ namespace HttpApiClient
             //.AddPolicyHandler(request => request.Method == HttpMethod.Post ? GetWaitAndRetryPolicy() : GetNoOpPolicy());
             .AddPolicyHandler((httpRequestMessage) =>
             {
-                if (_options.HttpMethodsToRetry.Contains(httpRequestMessage.Method)) {
+                if (_options.HttpMethodsToRetry.Contains(httpRequestMessage.Method.ToString())) {
                     return GetWaitAndRetryPolicy();
                 }
                 return GetNoOpPolicy();
@@ -148,21 +151,38 @@ namespace HttpApiClient
                     retryCount: _options.RetryCount,
                     sleepDurationProvider: (retryAttempt, result, context) => {
                         // result.Result will be null if the cause of the retry was an exception
+                        _logger.LogDebug($"WaitAndRetryAsync: _options.RetryCount: {_options.RetryCount} RetryAttempt: {retryAttempt}, StatusCode: {(int?)result?.Result?.StatusCode} ({result?.Result?.StatusCode.ToString()})");
+                        // Handle 429 TooManyRequests StatusCode
                         if (result.Result != null && result.Result.StatusCode == (HttpStatusCode)429) {
                             // If there is no Retry-After Header, the timespan will be zero
-                            TimeSpan retryAfter = GetServerWaitDuration(result.Result?.Headers);
-                            // Use either the server specified wait duration or the DefaultTooManyRequestsRetryDuration.
-                            var waitDuration = Math.Max(TimeSpan.FromSeconds(_options.DefaultTooManyRequestsRetryDuration.Value).TotalMilliseconds, retryAfter.TotalMilliseconds);
-                            return TimeSpan.FromMilliseconds(waitDuration) + TimeSpan.FromMilliseconds(jitterer.Next(0, _options.RetryJitterDuration.Value));
+                            TimeSpan? retryAfter = GetServerWaitDuration(result.Result?.Headers);
+                            _logger.LogDebug($"WaitAndRetryAsync: 429 (TooManyRequests) StatusCode encountered, parsing the Retry-After header returned TimeSpan: \"{retryAfter}\"");
+                            // Sanity check on the TimeSpan
+                            if (retryAfter != null && retryAfter <  TimeSpan.Zero) {
+                                _logger.LogWarning($"WaitAndRetryAsync: 429 (TooManyRequests) StatusCode encountered, parsing the Retry-After header resulted in a Negative TimeSpan: \"{retryAfter}\" Retry-After will be ignored, check the system clock!");
+                                retryAfter = null;
+                            }
+                            // Use either the server specified wait duration or the DefaultTooManyRequestsRetryDuration, or 60 seconds.
+                            // _options defaults should already have been set in the SetDefaults method
+                            TimeSpan waitDuration = retryAfter ?? TimeSpan.FromSeconds(_options.DefaultTooManyRequestsRetryDuration ?? 60);
+                            TimeSpan jitter = TimeSpan.FromMilliseconds(jitterer.Next(0, _options.RetryJitterDuration ?? 100));
+                            _logger.LogDebug($"WaitAndRetryAsync: 429 (TooManyRequests) StatusCode encountered, using Retry WaitDuration: \"{waitDuration}\" plus jitter: \"{jitter}\"");
+                            return waitDuration + jitter;
                         } else {
+                            // _options defaults should already have been set in the SetDefaults method
                             if (_options.UseExponentialRetryWaitDuration.Value) {
-                                // Otherwise just use an exponential wait based on the RetryWaitDuration and retryAttempt
-                                // RetryWaitDuration to the power of retryAttempt and jitter duration to the power of 3
-                                int jitterMaxDelay = _options.RetryJitterDuration.Value * retryAttempt * retryAttempt * retryAttempt;
-                                return TimeSpan.FromSeconds(Math.Pow(_options.RetryWaitDuration.Value, retryAttempt)) +
-                                TimeSpan.FromMilliseconds(jitterer.Next(0, jitterMaxDelay));
+                                // Use an exponential wait based on the RetryWaitDuration and retryAttempt
+                                // RetryWaitDuration to the power of retryAttempt plus jitter duration to the power of 3
+                                TimeSpan waitDuration = TimeSpan.FromSeconds(Math.Pow(_options.RetryWaitDuration ?? 4, retryAttempt));
+                                int jitterMaxDelay = (_options.RetryJitterDuration ?? 100) * retryAttempt * retryAttempt * retryAttempt;
+                                TimeSpan jitter = TimeSpan.FromMilliseconds(jitterer.Next(0, jitterMaxDelay));
+                                _logger.LogDebug($"WaitAndRetryAsync: Using Exponential Retry WaitDuration: \"{waitDuration}\" plus jitter: \"{jitter}\"");
+                                return waitDuration + jitter;
                             } else {
-                                return TimeSpan.FromSeconds(_options.RetryWaitDuration.Value) + TimeSpan.FromMilliseconds(jitterer.Next(0, _options.RetryJitterDuration.Value));
+                                TimeSpan waitDuration = TimeSpan.FromSeconds(_options.RetryWaitDuration ?? 4);
+                                TimeSpan jitter = TimeSpan.FromMilliseconds(jitterer.Next(0, _options.RetryJitterDuration ?? 100));
+                                _logger.LogDebug($"WaitAndRetryAsync: Using Retry WaitDuration: \"{waitDuration}\" plus jitter: \"{jitter}\"");
+                                return waitDuration + jitter;
                             }
                         }
                     },
@@ -175,14 +195,16 @@ namespace HttpApiClient
             return async(result, timeSpan, retryAttempt, context) => {
                 // Some nice logging
                 var retryInfo = GetRetryInfo(result, timeSpan, retryAttempt);
-                _logger.LogWarning(retryInfo.message);
                 string contentType = null;
                 string responseBody = null;
                 if (result.Result != null) {
                     contentType = result.Result.Content?.Headers?.ContentType?.ToString();
                     responseBody = await result.Result.Content?.ReadAsStringAsync();
-                    _logger.LogDebug($"ContentType: {contentType}\nResponseBody:\n{responseBody}");
+                    if (!string.IsNullOrEmpty(responseBody)) {
+                        _logger.LogDebug($"LogRetry: ContentType: {contentType}\nResponseBody:\n{responseBody}");
+                    }
                 }
+                _logger.LogWarning($"LogRetry: {retryInfo.message}");
                 // Store information about the retry attempts in the PolicyExecutionContext
                 BuildRetryInfo(result, timeSpan, retryAttempt, context, retryInfo.reason, retryInfo.message, contentType, responseBody);
             };
@@ -212,8 +234,8 @@ namespace HttpApiClient
             // Detect if we were redirected
             bool isRedirected = false;
             if (!String.IsNullOrEmpty(requestUrl) && requestUrl != originalRequestUrl) isRedirected = true;
-            string redirected = isRedirected ? "Redirected" : "";
-            string message = $"{DateTime.Now.ToString()} : Failed {redirected} {originalRequestMethod} Request to Resource: {resourcePath} {redirected}Url: {requestUrl} failed with {reason}. \nWaiting {timeSpan} ({timeSpan.TotalSeconds} seconds) before retrying...";
+            string redirected = isRedirected ? " Redirected" : "";
+            string message = $"{DateTime.Now.ToString()} : Failed{redirected} {originalRequestMethod} Request to Resource: {resourcePath} {redirected}Url: {requestUrl} failed with {reason}. \nWaiting {timeSpan} ({timeSpan.TotalSeconds} seconds) before retrying...";
             if (retryAttempt > 1) message = $"{message}. Retry attempts: {retryAttempt - 1}";
             return (message, reason);
         }
@@ -260,9 +282,9 @@ namespace HttpApiClient
         //         };
         // }
 
-        private TimeSpan GetServerWaitDuration(HttpResponseHeaders headers) {
+        private TimeSpan? GetServerWaitDuration(HttpResponseHeaders headers) {
             var retryAfter = headers?.RetryAfter;
-            if (retryAfter == null) return TimeSpan.Zero;
+            if (retryAfter == null) return null;
 
             return retryAfter.Date.HasValue ?
                 retryAfter.Date.Value - DateTime.UtcNow :

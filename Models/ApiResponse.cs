@@ -18,6 +18,9 @@ namespace HttpApiClient.Models
         public string StatusText { get; set; }
         public bool Redirected { get; set; }
         public string ContentType { get; set; }
+        public string ContentLength { get; set; }
+        public string ContentEncoding { get; set; }
+        public string TransferEncoding { get; set; } // Used when chunked transfer is used
         public HttpResponseHeaders Headers { get; set; }
         public RetryInfo RetryInfo { get; set; }
         public JToken Data { get; set; } // JToken parsed from the response body

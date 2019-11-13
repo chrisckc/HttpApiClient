@@ -54,6 +54,7 @@ namespace HttpApiClient
                         // The stream needs to be copied as it will be disposed when the HttpResponseMessage is disposed
                         await stream.CopyToAsync(apiResponse.BodyStream);
                         apiResponse.BodyStream.Seek(0, SeekOrigin.Begin); // The stream needs to be rewound back to the beginning
+                        _logger.LogDebug($"{DateTime.Now.ToString()} : BodyStream Length: {apiResponse.BodyStream.Length} bytes");
                         if (AlwaysPopulateResponseBody) apiResponse.Body = await response?.Content?.ReadAsStringAsync();
                     }
                 } catch(Exception ex) {
@@ -81,7 +82,7 @@ namespace HttpApiClient
                     } else if (apiResponse.Body != null) {
                         _logger.LogError($"{DateTime.Now.ToString()} : StatusCode indicates Failure: Response Body:\n{apiResponse.Body}");
                         // Just add a preview of the response body (could be some large html content)
-                        apiResponse.ErrorDetail = apiResponse.Body.Truncate(100);
+                        apiResponse.ErrorDetail = apiResponse.Body.TruncateToLength(100);
                     } else {
                         _logger.LogError($"{DateTime.Now.ToString()} : StatusCode indicates Failure: Response Body is empty, no additional error information is available");
                     }
@@ -109,8 +110,14 @@ namespace HttpApiClient
                 }
                 _logger.LogDebug($"{DateTime.Now.ToString()} : Response Status: {(int)response.StatusCode} ({response.StatusCode.ToString()})");
                 string contentType = response.Content?.Headers?.ContentType?.ToString();
+                string contentLength = response.Content?.Headers?.ContentLength?.ToString();
+                string contentEncoding = response.Content?.Headers?.ContentEncoding?.ToString();
+                string transferEncoding = GetHeaderValue(response?.Headers, "Transfer-Encoding");
                 //string contentType = GetHeaderValue(response.Headers, "Content-Type");
                 _logger.LogDebug($"{DateTime.Now.ToString()} : Response ContentType: {contentType}");
+                _logger.LogDebug($"{DateTime.Now.ToString()} : Response ContentEncoding: {contentEncoding}");
+                _logger.LogDebug($"{DateTime.Now.ToString()} : Response ContentLength: {contentLength}");
+                _logger.LogDebug($"{DateTime.Now.ToString()} : Response TransferEncoding: {transferEncoding}");
                 _logger.LogDebug($"{DateTime.Now.ToString()} : Response Headers:\n{response?.Headers?.ToString()}");
                 apiResponse.StatusCode = (int)response.StatusCode;
                 apiResponse.StatusText = response.StatusCode.ToString();
@@ -118,6 +125,9 @@ namespace HttpApiClient
                 apiResponse.Headers = response.Headers;
                 apiResponse.RetryAfter = GetServerWaitDuration(response.Headers);
                 apiResponse.ContentType = contentType;
+                apiResponse.ContentLength = contentLength;
+                apiResponse.ContentEncoding = contentEncoding;
+                apiResponse.TransferEncoding = transferEncoding;
                 apiResponse.RetryInfo = response.RequestMessage.GetRetryInfo();
             }
             apiResponse.Timestamp = DateTime.Now; 
@@ -196,14 +206,13 @@ namespace HttpApiClient
             return apiResponse;
         }
 
-        private TimeSpan? GetServerWaitDuration(HttpResponseHeaders headers)
-        {
+        private TimeSpan? GetServerWaitDuration(HttpResponseHeaders headers) {
             var retryAfter = headers?.RetryAfter;
             if (retryAfter == null) return null;
-            
-            return retryAfter.Date.HasValue
-                ? retryAfter.Date.Value - DateTime.UtcNow
-                : retryAfter.Delta.GetValueOrDefault(TimeSpan.Zero);
+
+            return retryAfter.Date.HasValue ?
+                retryAfter.Date.Value - DateTime.UtcNow :
+                retryAfter.Delta.GetValueOrDefault(TimeSpan.Zero);
         }
 
         protected string GetHeaderValue(HttpResponseHeaders headers, string key) {

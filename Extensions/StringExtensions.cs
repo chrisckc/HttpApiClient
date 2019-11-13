@@ -8,7 +8,7 @@ namespace HttpApiClient.Extensions
         /// <param name="text">string that will be truncated</param>
         /// <param name="maxLength">length of characters to maintain before truncation</param>
         /// <returns>truncated string</returns>
-        public static string Truncate(this string text, int maxLength)
+        public static string TruncateToLength(this string text, int maxLength)
         {
             // suffixes the truncated string with "..."
             const string suffix = "...";

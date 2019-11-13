@@ -23,6 +23,9 @@ namespace HttpApiClient {
 
         protected ApiClientOptions<TClient> _options;
         public CancellationTokenSource CancellationTokenSource { get; set; }
+        public string BasicAuth { get; private set; }
+        public string BearerToken { get; private set; }
+        public string Cookie { get; private set; }
         public int PendingRequestCount { get; set; }
         public int RequestCount { get; set; }
         public DateTimeOffset LastRequestTimeStamp { get; private set; }
@@ -49,29 +52,32 @@ namespace HttpApiClient {
 
         public void SetBasicAuth(string username, string password) {
             string basicAuth = string.Format("{0}:{1}", username, password);
+            BasicAuth = basicAuth;
             string encodedAuth = Convert.ToBase64String(System.Text.ASCIIEncoding.ASCII.GetBytes(basicAuth));
             _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", encodedAuth);
         }
 
-        public void clearBasicAuth(string bearerToken) {
+        public void clearBasicAuth() {
             _client.DefaultRequestHeaders.Remove("Authorization");
         }
 
         // Set the OAuth 2.0 bearer token
         public void SetBearerToken(string bearerToken) {
+            BearerToken = bearerToken;
             _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
         }
 
-        public void clearBearerToken(string bearerToken) {
+        public void clearBearerToken() {
             _client.DefaultRequestHeaders.Remove("Authorization");
         }
 
         // Set the Cookie
         public void SetCookie(string cookie) {
+            Cookie = cookie;
             _client.DefaultRequestHeaders.Add("Cookie", cookie);
         }
 
-        public void clearCookie(string bearerToken) {
+        public void clearCookie() {
             _client.DefaultRequestHeaders.Remove("Cookie");
         }
 
@@ -117,9 +123,10 @@ namespace HttpApiClient {
 
         // Send a string with optional media type
         public virtual async Task<ApiResponse> SendStringAsync(HttpMethod method, string resourcePath, string str, string mediaType = "text/plain") {
-            _logger.LogDebug("{DateTime.Now.ToString()} : SendAsync: Sending string as StringContent");
+            _logger.LogDebug("{DateTime.Now.ToString()} : SendStringAsync: Sending string as StringContent");
             StringContent stringContent = null; // StringContent: Provides HTTP content based on a string.
             if (str != null) {
+                _logger.LogDebug($"{DateTime.Now.ToString()} : SendStringAsync: Creating StringContent with Length: {ASCIIEncoding.UTF8.GetByteCount(str)} bytes");
                 stringContent = new StringContent(str, System.Text.Encoding.UTF8, mediaType);
             }
             return await SendAsync(method, resourcePath, stringContent);
@@ -127,7 +134,7 @@ namespace HttpApiClient {
 
         // Send a string with optional media type
         public virtual async Task<ApiResponse> SendStringAsStreamAsync(HttpMethod method, string resourcePath, string str, string mediaType = "text/plain") {
-            _logger.LogDebug("{DateTime.Now.ToString()} : SendStringAsStreamAsync: Sending string as StringContent");
+            _logger.LogDebug("{DateTime.Now.ToString()} : SendStringAsStreamAsync: Sending string as StreamContent");
             StreamContent streamContent = null;
             if (str != null) {
                 streamContent = CreateStringStreamContent(str, mediaType);
@@ -149,6 +156,7 @@ namespace HttpApiClient {
                     try {
                         _logger.LogDebug($"{DateTime.Now.ToString()} : SendObjectAsync: Serializing Object of Type: \"{obj?.GetType()?.Name?.ToString()}\" to JSON");
                         string jsonString = JsonConvert.SerializeObject(obj, _options.SerializeUseFormattingIndented ? Formatting.Indented : Formatting.None, settings);
+                        _logger.LogDebug($"{DateTime.Now.ToString()} : SendObjectAsync: Creating StringContent with Length: {ASCIIEncoding.UTF8.GetByteCount(jsonString)} bytes");
                         stringContent = new StringContent(jsonString, System.Text.Encoding.UTF8, "application/json");
                     } catch (Exception exception) {
                         //log exception but don't throw one
@@ -165,10 +173,10 @@ namespace HttpApiClient {
             if (obj != null) {
                 string str = obj as string;
                 if (str != null) {
-                    _logger.LogDebug("{DateTime.Now.ToString()} : SendObjectAsStreamAsync: Sending string as StringContent");
+                    _logger.LogDebug("{DateTime.Now.ToString()} : SendObjectAsStreamAsync: Sending string as StreamContent");
                     streamContent = CreateStringStreamContent(str, "text/plain");
                 } else {
-                    _logger.LogDebug($"{DateTime.Now.ToString()} : SendObjectAsStreamAsync: Sending object as JSON Serialized StringContent");
+                    _logger.LogDebug($"{DateTime.Now.ToString()} : SendObjectAsStreamAsync: Sending object as JSON Serialized StreamContent");
                     var settings = GetJsonSerializerSettings();
                     try {
                         _logger.LogDebug($"{DateTime.Now.ToString()} : SendObjectAsStreamAsync: Serializing Object of Type: \"{obj?.GetType()?.Name?.ToString()}\" to JSON");
@@ -223,6 +231,7 @@ namespace HttpApiClient {
                 var ms = new MemoryStream();
                 SerializeJsonIntoStream(obj, ms, settings);
                 ms.Seek(0, SeekOrigin.Begin);
+                _logger.LogDebug($"{DateTime.Now.ToString()} : CreateJsonStreamContent: Stream Length: {ms.Length} bytes");
                 httpContent = new StreamContent(ms);
                 httpContent.Headers.ContentType = new MediaTypeHeaderValue("application/json");
             }
@@ -235,6 +244,7 @@ namespace HttpApiClient {
                 byte[] byteArray = Encoding.UTF8.GetBytes(str);
                 var ms = new MemoryStream(byteArray);
                 ms.Seek(0, SeekOrigin.Begin);
+                _logger.LogDebug($"{DateTime.Now.ToString()} : CreateStringStreamContent: Stream Length: {ms.Length} bytes");
                 httpContent = new StreamContent(ms);
                 httpContent.Headers.ContentType = new MediaTypeHeaderValue(mediaType);
             }
@@ -270,7 +280,11 @@ namespace HttpApiClient {
             PendingRequestCount++;
             LastRequestTimeStamp = DateTime.UtcNow;
             try {
-                _logger.LogDebug($"{DateTime.Now.ToString()} : SendAsync: Sending request with Method: {method?.ToString()} HttpContent Type: \"{content?.GetType()?.Name?.ToString()}\" RequestUri: {request.RequestUri}");
+                if (content ==  null) {
+                    _logger.LogDebug($"{DateTime.Now.ToString()} : SendAsync: Sending request with Method: {method?.ToString()} HttpContent is null, RequestUri: {request.RequestUri}");
+                } else {
+                    _logger.LogDebug($"{DateTime.Now.ToString()} : SendAsync: Sending request with Method: {method?.ToString()} HttpContent Type: \"{content?.GetType()?.Name?.ToString()}\" RequestUri: {request.RequestUri}");
+                }
                 using(var response = await _client.SendAsync(request, CancellationTokenSource.Token)) {
                     TransferRetryInfo(response.RequestMessage, context);
                     return await _apiResponseBuilder.GetApiResponse(response, resourcePath);

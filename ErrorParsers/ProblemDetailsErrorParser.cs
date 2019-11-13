@@ -114,8 +114,8 @@ namespace HttpApiClient.ErrorParsers
             } else if (jToken.Type ==  JTokenType.Array) {
                 var jArr = (JArray)jToken;
                 if (jArr.Count > 0) {
-                    var firstJToken = jArr.First();
-                    if (firstJToken.Type == JTokenType.Object) {
+                    var firstJToken = jArr.FirstOrDefault();
+                    if (firstJToken != null && firstJToken.Type == JTokenType.Object) {
                         jObject = (JObject)firstJToken;
                     }
                 }
