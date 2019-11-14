@@ -34,7 +34,8 @@ namespace HttpApiClient.Models
         public string ErrorInstance { get; set; }
         public bool BodyParsingFailed { get; set; } // If an error occurred while parsing the response body
         public TimeSpan? RetryAfter { get; set; }
-        public DateTimeOffset Timestamp { get; set; }
+        public DateTimeOffset Timestamp { get; set; } // TimeStamp when the response arrived
+        public long? RequestDuration { get; set; } // Duration of the HttpRequest-Response in milliseconds
 
         public ApiResponse(bool success, string resource)
         {

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -279,22 +280,26 @@ namespace HttpApiClient {
             RequestCount++;
             PendingRequestCount++;
             LastRequestTimeStamp = DateTime.UtcNow;
+            var requestTimer = new Stopwatch();
             try {
                 if (content ==  null) {
                     _logger.LogDebug($"{DateTime.Now.ToString()} : SendAsync: Sending request with Method: {method?.ToString()} HttpContent is null, RequestUri: {request.RequestUri}");
                 } else {
                     _logger.LogDebug($"{DateTime.Now.ToString()} : SendAsync: Sending request with Method: {method?.ToString()} HttpContent Type: \"{content?.GetType()?.Name?.ToString()}\" RequestUri: {request.RequestUri}");
                 }
+                requestTimer.Start();
                 using(var response = await _client.SendAsync(request, CancellationTokenSource.Token)) {
+                    requestTimer.Stop();
                     TransferRetryInfo(response.RequestMessage, context);
-                    return await _apiResponseBuilder.GetApiResponse(response, resourcePath);
+                    return await _apiResponseBuilder.GetApiResponse(response, resourcePath, requestTimer);
                 }
             } catch (Exception exception) {
                 // Handles communication errors such as "Connection Refused" etc.
                 // Network failures (System.Net.Http.HttpRequestException)
                 // Timeouts (System.IO.IOException)
+                requestTimer.Stop();
                 TransferRetryInfo(exception, context);
-                return _apiResponseBuilder.GetApiResponse(exception, request, resourcePath);
+                return _apiResponseBuilder.GetApiResponse(exception, request, resourcePath, requestTimer);
             } finally {
                 PendingRequestCount--;
             }
