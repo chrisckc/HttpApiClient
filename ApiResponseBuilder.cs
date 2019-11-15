@@ -165,12 +165,13 @@ namespace HttpApiClient
             }
         }
 
-        public ApiResponse GetApiResponse(Exception exception, HttpRequestMessage request, string resource, Stopwatch requestTimer = null) {
+        public ApiResponse GetApiResponseForException(Exception exception, HttpRequestMessage request, string resource, Stopwatch requestTimer = null) {
             ApiResponse apiResponse = new ApiResponse(false, resource);
             apiResponse.RequestDuration = requestTimer.ElapsedMilliseconds;
             apiResponse.Timestamp = DateTime.Now;
-            _logger.LogDebug($"{DateTime.Now.ToString()} : GetApiResponse: ApiResponse.Success: {apiResponse.Success} ApiResponse.RequestDuration: {apiResponse.RequestDuration}ms ApiResponse.Timestamp: {apiResponse.Timestamp}");
+            _logger.LogError($"{DateTime.Now.ToString()} : GetApiResponseForException: ApiResponse.Success: {apiResponse.Success} ApiResponse.RequestDuration: {apiResponse.RequestDuration}ms ApiResponse.Timestamp: {apiResponse.Timestamp}");
             try {
+                _logger.LogError($"{DateTime.Now.ToString()} : GetApiResponseForException: Exception occurred during HttpRequest, Exception: \n{exception.ToString()}");
                 apiResponse.Method = request?.Method?.ToString();
                 apiResponse.Exception = exception;
                 if (exception is System.OperationCanceledException || exception is TaskCanceledException) {
@@ -182,12 +183,12 @@ namespace HttpApiClient
                 }
                 if (exception.InnerException != null) {
                     apiResponse.ErrorType = $"{exception.GetType().Name} | {exception.InnerException.GetType().Name}";
-                    apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nException: {exception.Message} \n{exception.InnerException.Message}";
+                    apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nException.Message: {exception.Message} \nInnerException.Message: {exception.InnerException.Message}";
                 } else {
                     apiResponse.ErrorType = $"{exception.GetType().Name}";
-                    apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nException: {exception.Message}";
+                    apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nException.Message: {exception.Message}";
                 }
-                _logger.LogError($"{DateTime.Now.ToString()} : GetApiResponse: ApiResponse.ErrorDetail: {apiResponse.ErrorDetail}");
+                _logger.LogDebug($"{DateTime.Now.ToString()} : GetApiResponseForException: ApiResponse.ErrorDetail: {apiResponse.ErrorDetail}");
                 apiResponse.RetryInfo = exception.GetRetryInfo();
                 apiResponse.OriginalMethod = (string)request.GetOriginalRequestMethod();
                 if (request?.RequestUri != null && request.RequestUri.IsAbsoluteUri) {
@@ -198,15 +199,16 @@ namespace HttpApiClient
                 apiResponse.OriginalUrl = (string)request.GetOriginalRequestUrl();
                 if (apiResponse.OriginalUrl != null && apiResponse.Url != apiResponse.OriginalUrl) {
                     apiResponse.Redirected = true;
-                    _logger.LogWarning($"{DateTime.Now.ToString()} : GetApiResponse: The Request was Redirected from: {apiResponse.OriginalUrl} \nto: {apiResponse.Url}");
+                    _logger.LogWarning($"{DateTime.Now.ToString()} : GetApiResponseForException: The Request was Redirected from: {apiResponse.OriginalUrl} \nto: {apiResponse.Url}");
                 }
             } catch (Exception ex) {
-                _logger.LogError($"{DateTime.Now.ToString()} : GetApiResponse: Exception occurred during GetApiResponse: \n{ex.ToString()}");
+                _logger.LogError($"{DateTime.Now.ToString()} : GetApiResponseForException: Exception occurred during GetApiResponseForException() method, Exception: \n{ex.ToString()}");
                 if (apiResponse.ErrorDetail != null) {
-                    apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nThe ApiResponse object could not be fully generated. Refer to the Exception property for details of the error";
+                    apiResponse.ErrorDetail = $"{apiResponse.ErrorDetail} \nThe ApiResponse object could not be fully generated as an Exception occurred during GetApiResponseForException() method.";
                 } else {
-                    apiResponse.ErrorDetail = "The ApiResponse object could not be fully generated. Refer to the Exception property for details of the error";
+                    apiResponse.ErrorDetail = "The ApiResponse object could not be fully generated as an Exception occurred during GetApiResponseForException() method.";
                 }
+                _logger.LogDebug($"{DateTime.Now.ToString()} : GetApiResponseForException: ApiResponse.ErrorDetail: {apiResponse.ErrorDetail}");
             }
             return apiResponse;
         }

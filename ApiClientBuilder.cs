@@ -117,12 +117,13 @@ namespace HttpApiClient
                 }
                 client.Timeout = Timeout.InfiniteTimeSpan; // Required when using the TimeoutHandler     
             })
-            // Add the Timeout Handler so we can determine when a request actually times out
             // AutomaticDecompression, on .NET Core 2.0, the default is now DecompressionMethods.None;
             // Note about cookies: https://github.com/Microsoft/dotnet/issues/395
+            // Add the Timeout Handler so we can determine when a request actually times out
+            // The delegate should return a new instance of the message handler each time it is invoked.
             .ConfigurePrimaryHttpMessageHandler(() => new TimeoutHandler(_logger) {
                 DefaultTimeout = TimeSpan.FromSeconds(_options.RequestTimeout.Value),
-                InnerHandler = handler
+                InnerHandler = GetHttpClientHandler()
             })
             // Configure Polly
             //.AddPolicyHandler(waitAndRetryPolicy)
@@ -134,6 +135,19 @@ namespace HttpApiClient
                 }
                 return GetNoOpPolicy();
             });
+        }
+
+        private HttpClientHandler GetHttpClientHandler() {
+            // Create the custom HttpClientHandler
+            var handler = new HttpClientHandler() {
+                UseCookies = false, // allows Cookie to be set via DefaultRequestHeaders
+                AllowAutoRedirect = _options.AllowAutoRedirect.Value,
+                AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip
+            };
+            if (_options.IgnoreServerCertificateErrors) {
+                handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => { return true; };
+            }
+            return handler;
         }
 
         private IAsyncPolicy<HttpResponseMessage> GetNoOpPolicy() {

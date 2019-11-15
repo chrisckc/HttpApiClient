@@ -299,7 +299,7 @@ namespace HttpApiClient {
                 // Timeouts (System.IO.IOException)
                 requestTimer.Stop();
                 TransferRetryInfo(exception, context);
-                return _apiResponseBuilder.GetApiResponse(exception, request, resourcePath, requestTimer);
+                return _apiResponseBuilder.GetApiResponseForException(exception, request, resourcePath, requestTimer);
             } finally {
                 PendingRequestCount--;
             }

@@ -17,6 +17,7 @@ namespace HttpApiClient.Handlers
 
         public TimeoutHandler(ILogger logger)
         {
+            if (logger == null) throw new ArgumentNullException(nameof(logger)); 
             _logger = logger;
         }
         
@@ -28,6 +29,8 @@ namespace HttpApiClient.Handlers
         */
         protected async override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (request == null) throw new ArgumentNullException(nameof(request));
+
             using (var cts = GetCancellationTokenSource(request, cancellationToken))
             {
                 try
@@ -46,10 +49,10 @@ namespace HttpApiClient.Handlers
                         string originalRequestUrl = (string)request.GetOriginalRequestUrl();
                         bool isRedirected = false;
                         if (!String.IsNullOrEmpty(requestUrl) && requestUrl != originalRequestUrl) isRedirected = true;
-                        string redirected = isRedirected ? "Redirected" : "";
+                        string redirected = isRedirected ? " Redirected" : "";
                         string originalRequestMethod = (string)request.GetOriginalRequestMethod();
                         // Log the fact that this request is due to a retry
-                        _logger.LogWarning($"{DateTime.Now.ToString()} : Retrying Failed {redirected} {originalRequestMethod} Request to Resource: {resourcePath} {redirected}Url: {requestUrl}");
+                        _logger.LogWarning($"{DateTime.Now.ToString()} SendAsync: Retrying a Failed{redirected} {originalRequestMethod} Request to Resource: {resourcePath} {redirected}Url: {requestUrl}");
                     }
                     var response = await base.SendAsync(request, cts?.Token ?? cancellationToken);
                     return response;
@@ -66,6 +69,7 @@ namespace HttpApiClient.Handlers
                 } 
                 catch(Exception ex)
                 {
+                    _logger.LogError($"{DateTime.Now.ToString()} SendAsync: Exception occurred in SendAsync() method, Request Url: {request?.RequestUri?.AbsoluteUri?.ToString()} Exception:\n{ex.ToString()}");
                     AugmentException(ex, request);
                     throw ex;
                 }
