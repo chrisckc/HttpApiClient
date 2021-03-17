@@ -154,7 +154,7 @@ namespace HttpApiClient
             return Policy.NoOpAsync().AsAsyncPolicy<HttpResponseMessage>();
         }
 
-        private RetryPolicy<HttpResponseMessage> GetWaitAndRetryPolicy() {
+        private AsyncRetryPolicy<HttpResponseMessage> GetWaitAndRetryPolicy() {
             //int jittererMaxDelay = 100; // Maximum delay to add in Milliseconds
             Random jitterer = new Random();
             // Handle exceptions and a set of http status codes in one policy definition

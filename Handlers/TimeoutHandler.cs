@@ -17,10 +17,10 @@ namespace HttpApiClient.Handlers
 
         public TimeoutHandler(ILogger logger)
         {
-            if (logger == null) throw new ArgumentNullException(nameof(logger)); 
+            if (logger == null) throw new ArgumentNullException(nameof(logger));
             _logger = logger;
         }
-        
+
         /*  This Handler must be configured as the PrimaryHttpMessageHandler so that it
             gets invoked during the Polly retry attempts and is able to detect the original url and method
             This handler swaps out OperationCanceledException when a request timeout occurs
@@ -66,7 +66,7 @@ namespace HttpApiClient.Handlers
                     tex.Source = "TimeoutHandler";
                     AugmentException(tex, request);
                     throw tex;
-                } 
+                }
                 catch(Exception ex)
                 {
                     _logger.LogError($"{DateTime.Now.ToString()} SendAsync: Exception occurred in SendAsync() method, Request Url: {request?.RequestUri?.AbsoluteUri?.ToString()} Exception:\n{ex.ToString()}");
@@ -77,13 +77,13 @@ namespace HttpApiClient.Handlers
         }
 
         private void AugmentRequest(HttpRequestMessage request) {
-            // As long as the request is not a retry, 
+            // As long as the request is not a retry,
             // the RequestUri and Method will always be the original ones as this code will not be hit
             // if a redirection occurs as it is handled further down the chain.
             request.SetOriginalRequestUrl(request?.RequestUri?.AbsoluteUri?.ToString());
             request.SetOriginalRequestMethod(request?.Method?.ToString());
         }
-        
+
         private void AugmentException(Exception exception, HttpRequestMessage request) {
             // Store the current url and method in the exception, used to detect redirects
             exception.SetResourcePath(request?.GetResourcePath());
@@ -93,7 +93,7 @@ namespace HttpApiClient.Handlers
             exception.SetOriginalRequestUrl(request?.GetOriginalRequestUrl());
             exception.SetOriginalRequestMethod(request?.GetOriginalRequestMethod());
         }
-        
+
         private CancellationTokenSource GetCancellationTokenSource(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var timeout = request.GetTimeout() ?? DefaultTimeout;

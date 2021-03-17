@@ -19,7 +19,7 @@ namespace HttpApiClient.ErrorParsers
             _logger = logger;
         }
 
-        public bool ParseKnownErrors(ApiResponse apiResponse) {
+        public virtual bool ParseKnownErrors(ApiResponse apiResponse) {
             bool success = false;
             if (apiResponse != null) {
                 _logger.LogDebug($"{this.GetType().ToString()} : ParseKnownErrors: Parsing Response Object for Known 'ProblemDetails'");
@@ -75,7 +75,7 @@ namespace HttpApiClient.ErrorParsers
                     apiResponse.ErrorTitle = errorTitle;
                     problemDetailsFound = true;
                 }
-                
+
                 // Try to get an error type
                 string errorType = errorObj.SelectStringValue("type");
                 if (errorType == null) errorType = errorObj.SelectToken("error")?.SelectStringValue("type");

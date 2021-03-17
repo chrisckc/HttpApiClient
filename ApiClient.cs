@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using HttpApiClient.Extensions;
 using HttpApiClient.Models;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions.Internal;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
